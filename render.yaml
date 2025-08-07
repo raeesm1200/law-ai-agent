@@ -23,3 +23,6 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run preview -- --host 0.0.0.0 --port $PORT
     rootDir: ./
+    envVars:
+      - key: VITE_API_URL
+        value: https://legal-rag-chatbot-api.onrender.com
