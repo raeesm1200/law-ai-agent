@@ -50,6 +50,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000", 
         "http://127.0.0.1:3000",
+        "https://law-ai-agent-1.onrender.com",  # Your frontend URL
         "https://*.render.com",
         "https://*.vercel.app",
         "https://*.netlify.app"

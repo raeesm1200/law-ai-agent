@@ -7,19 +7,9 @@ const getAPIBaseURL = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // If we're on Render (onrender.com domain), try to detect backend URL
+  // If we're on Render (onrender.com domain), use the known backend URL
   if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-    const hostname = window.location.hostname;
-    // Try common Render naming patterns
-    const possibleBackendHosts = [
-      hostname.replace('-1', ''), // law-ai-agent.onrender.com
-      hostname.replace('frontend', 'api'), // if it contains 'frontend'
-      'law-ai-agent.onrender.com', // fallback
-      'legal-rag-chatbot-api.onrender.com' // original planned name
-    ];
-    
-    // Return the first possible host (we'll handle connection errors in the client)
-    return `https://${possibleBackendHosts[0]}`;
+    return 'https://law-ai-agent.onrender.com';
   }
   
   // Development fallback
