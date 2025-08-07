@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import { Separator } from "./ui/separator";
 import { 
   MessageSquare, 
   Info, 
@@ -39,7 +38,6 @@ interface ChatSidebarProps {
   onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
   isMobile?: boolean;
-  isOpen?: boolean;
   onClose?: () => void;
   onCountryChange?: (country: string) => void;
   selectedCountry?: string;
@@ -52,7 +50,6 @@ export function ChatSidebar({
   onNewConversation,
   onDeleteConversation,
   isMobile = false,
-  isOpen = true,
   onClose = () => {},
   onCountryChange = () => {},
   selectedCountry: propSelectedCountry = "italy"
