@@ -16,13 +16,13 @@ A sophisticated legal assistance chatbot built with React frontend and FastAPI b
 ## 🏗️ Architecture
 
 ```mermaid
-Frontend (React + TypeScript + Tailwind CSS)
-    ↓ HTTP API calls
-Backend (FastAPI + Python)
-    ↓ RAG Pipeline
-Legal Document Database (Qdrant Vector Store - 49K+ docs)
-    ↓ LLM Processing
-Groq (llama-3.3-70b-versatile Model)
+graph TD
+    A[Frontend<br/>React + TypeScript + Tailwind CSS] -->|HTTP API calls| B[Backend<br/>FastAPI + Python]
+    B -->|RAG Pipeline| C[Legal Document Database<br/>Qdrant Vector Store - 49K+ docs]
+    B -->|Query Processing| D[Groq LLM<br/>llama-3.3-70b-versatile]
+    C -->|Document Retrieval| B
+    D -->|AI Response| B
+    B -->|JSON Response| A
 ```
 
 ## 📋 Prerequisites
