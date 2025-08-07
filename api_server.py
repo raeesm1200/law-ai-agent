@@ -210,11 +210,18 @@ async def internal_error_handler(request, exc):
 
 if __name__ == "__main__":
     print("🚀 Starting Legal RAG Chatbot API Server...")
+    # Use PORT environment variable (for Render.com) or default to 8000
+    port = int(os.environ.get("PORT", 8000))
+    print(f"📡 Starting server on port {port}")
+    
+    # Disable reload in production
+    is_production = os.environ.get("ENVIRONMENT") == "production"
+    
     uvicorn.run(
         "api_server:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True,
-        reload_dirs=["./"],
+        port=port,
+        reload=not is_production,
+        reload_dirs=["./"] if not is_production else None,
         log_level="info"
     )
