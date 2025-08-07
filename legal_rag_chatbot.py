@@ -24,7 +24,6 @@ from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
 from langchain_groq import ChatGroq
 from langchain_community.vectorstores import Qdrant
-from langchain_community.embeddings import SentenceTransformerEmbeddings
 
 # Qdrant imports
 from qdrant_client import QdrantClient
@@ -68,7 +67,8 @@ class LegalRAGChatbot:
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
         self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "law_chunks")
         
-        # Model Configuration
+        # Model Configuration - Keep original model for embedding compatibility
+        # Use lazy loading and other optimizations to manage memory
         self.embedding_model_name = "intfloat/multilingual-e5-base"
         self.llm_model_name = "llama-3.3-70b-versatile"  
         
@@ -91,24 +91,40 @@ class LegalRAGChatbot:
             raise
             
     def setup_embeddings(self):
-        """Initialize the embedding model."""
+        """Initialize the embedding model - optimized for memory with lazy loading."""
         try:
-            self.embeddings = SentenceTransformerEmbeddings(
-                model_name=self.embedding_model_name,
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={
-                    'normalize_embeddings': True,
-                    'convert_to_numpy': True
-                }
-            )
+            # Use lazy loading - model loads only when first used
+            class OptimizedEmbeddings:
+                def __init__(self, model_name):
+                    self.model_name = model_name
+                    self._model = None
+                
+                @property
+                def model(self):
+                    if self._model is None:
+                        from sentence_transformers import SentenceTransformer
+                        self._model = SentenceTransformer(
+                            self.model_name, device='cpu'
+                        )
+                    return self._model
+                
+                def embed_documents(self, texts):
+                    return self.model.encode(texts, normalize_embeddings=True)
+                
+                def embed_query(self, text):
+                    return self.model.encode(
+                        [text], normalize_embeddings=True
+                    )[0]
             
-            # Also initialize the direct sentence transformer for query embedding
-            from sentence_transformers import SentenceTransformer
-            self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
+            self.embeddings = OptimizedEmbeddings(self.embedding_model_name)
+            # Set sentence_transformer to use the same lazy-loaded instance
+            self.sentence_transformer = self.embeddings
             
-            print(f"{Fore.GREEN}✅ Embeddings initialized: {self.embedding_model_name}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Embeddings configured (lazy loading): "
+                  f"{self.embedding_model_name}{Style.RESET_ALL}")
         except Exception as e:
-            print(f"{Fore.RED}❌ Failed to initialize embeddings: {e}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ Failed to configure embeddings: "
+                  f"{e}{Style.RESET_ALL}")
             raise
             
     def setup_vector_store(self):
@@ -339,11 +355,11 @@ Legal Assistant Response:"""
     def search_documents(self, query: str, k: int = 5) -> List[Document]:
         """Search for relevant documents in the vector store."""
         try:
-            # Use direct sentence transformer to create query embedding
+            # Use optimized embeddings to create query embedding
             formatted_query = f"query: {query.strip()}"
-            query_embedding = self.sentence_transformer.encode(formatted_query, convert_to_numpy=True).tolist()
-            
-            
+            query_embedding = self.embeddings.embed_query(
+                formatted_query
+            ).tolist()
             
             search_results = self.qdrant_client.search(
                 collection_name=self.qdrant_collection,
