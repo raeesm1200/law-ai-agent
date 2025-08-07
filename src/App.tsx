@@ -154,7 +154,6 @@ function App() {
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}
           isMobile={false}
-          isOpen={true}
           onClose={() => {}}
           onCountryChange={setSelectedCountry}
           selectedCountry={selectedCountry}
@@ -182,7 +181,6 @@ function App() {
               }}
               onDeleteConversation={handleDeleteConversation}
               isMobile={true}
-              isOpen={isSidebarOpen}
               onClose={() => setIsSidebarOpen(false)}
               onCountryChange={setSelectedCountry}
               selectedCountry={selectedCountry}
