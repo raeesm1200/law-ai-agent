@@ -202,11 +202,26 @@ async def root():
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    return {"error": "Endpoint not found", "message": "Please check the API documentation at /docs"}
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "Endpoint not found",
+            "message": "Please check the API documentation at /docs"
+        }
+    )
+
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):
-    return {"error": "Internal server error", "message": "Something went wrong on our end"}
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "message": "Something went wrong on our end"
+        }
+    )
 
 if __name__ == "__main__":
     print("🚀 Starting Legal RAG Chatbot API Server...")
