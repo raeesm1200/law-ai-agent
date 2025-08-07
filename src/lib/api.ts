@@ -1,7 +1,32 @@
 import axios from 'axios';
 
-// Use environment variable for API URL, fallback to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Smart API URL detection for Render deployment
+const getAPIBaseURL = () => {
+  // If environment variable is set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // If we're on Render (onrender.com domain), try to detect backend URL
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    const hostname = window.location.hostname;
+    // Try common Render naming patterns
+    const possibleBackendHosts = [
+      hostname.replace('-1', ''), // law-ai-agent.onrender.com
+      hostname.replace('frontend', 'api'), // if it contains 'frontend'
+      'law-ai-agent.onrender.com', // fallback
+      'legal-rag-chatbot-api.onrender.com' // original planned name
+    ];
+    
+    // Return the first possible host (we'll handle connection errors in the client)
+    return `https://${possibleBackendHosts[0]}`;
+  }
+  
+  // Development fallback
+  return 'http://localhost:8000';
+};
+
+const API_BASE_URL = getAPIBaseURL();
 
 export interface ChatMessage {
   message: string;

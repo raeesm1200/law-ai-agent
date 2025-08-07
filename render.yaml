@@ -25,4 +25,4 @@ services:
     rootDir: ./
     envVars:
       - key: VITE_API_URL
-        value: https://legal-rag-chatbot-api.onrender.com
+        value: https://law-ai-agent.onrender.com
