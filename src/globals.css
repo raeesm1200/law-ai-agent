@@ -1,0 +1,241 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+ 
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
+  }
+ 
+  .dark {
+    /* Dark purple/blue gradient theme */
+    --background: 245 30% 8%;
+    --foreground: 220 15% 95%;
+    --card: 245 25% 12%;
+    --card-foreground: 220 15% 95%;
+    --popover: 245 25% 12%;
+    --popover-foreground: 220 15% 95%;
+    --primary: 260 85% 65%;
+    --primary-foreground: 245 30% 8%;
+    --secondary: 250 20% 15%;
+    --secondary-foreground: 220 15% 85%;
+    --muted: 250 15% 18%;
+    --muted-foreground: 220 10% 65%;
+    --accent: 255 50% 25%;
+    --accent-foreground: 220 15% 95%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 220 15% 95%;
+    --border: 250 20% 20%;
+    --input: 250 20% 18%;
+    --ring: 260 85% 65%;
+    --radius: 1rem;
+    
+    /* Sidebar specific colors */
+    --sidebar: 245 35% 10%;
+    --sidebar-foreground: 220 15% 85%;
+    --sidebar-border: 250 25% 18%;
+    --sidebar-accent: 255 40% 20%;
+    
+    /* Input background for mobile */
+    --input-background: 250 25% 15%;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Mobile gradient background */
+    background: linear-gradient(135deg, 
+      hsl(245 30% 8%) 0%, 
+      hsl(250 35% 12%) 25%, 
+      hsl(255 40% 10%) 50%, 
+      hsl(260 45% 8%) 75%, 
+      hsl(245 30% 8%) 100%
+    );
+    min-height: 100vh;
+  }
+}
+
+/* Custom gradient components for mobile theme */
+@layer components {
+  /* Chat message styles */
+  .chat-message {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+  }
+  
+  .chat-container {
+    max-width: min(95vw, 48rem); /* More space on mobile */
+  }
+  
+  /* Mobile gradient card styles */
+  .mobile-card {
+    background: linear-gradient(135deg, 
+      hsl(250 25% 12%) 0%, 
+      hsl(255 30% 15%) 50%, 
+      hsl(250 25% 12%) 100%
+    );
+    border: 1px solid hsl(250 25% 20%);
+    backdrop-filter: blur(20px);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Mobile button gradient */
+  .mobile-button {
+    background: linear-gradient(135deg, 
+      hsl(260 70% 50%) 0%, 
+      hsl(270 80% 60%) 50%, 
+      hsl(260 70% 50%) 100%
+    );
+    border: 1px solid hsl(260 60% 40%);
+    box-shadow: 
+      0 4px 15px rgba(139, 69, 255, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .mobile-button:hover {
+    background: linear-gradient(135deg, 
+      hsl(260 70% 55%) 0%, 
+      hsl(270 80% 65%) 50%, 
+      hsl(260 70% 55%) 100%
+    );
+    transform: translateY(-1px);
+    box-shadow: 
+      0 6px 20px rgba(139, 69, 255, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.15);
+  }
+  
+  /* Mobile input field */
+  .mobile-input {
+    background: linear-gradient(135deg, 
+      hsl(250 20% 15%) 0%, 
+      hsl(255 25% 18%) 100%
+    );
+    border: 1px solid hsl(250 25% 25%);
+    backdrop-filter: blur(10px);
+    box-shadow: 
+      inset 0 1px 3px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+  
+  .mobile-input:focus {
+    border-color: hsl(260 70% 50%);
+    box-shadow: 
+      0 0 0 2px hsl(260 70% 50% / 0.2),
+      inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Mobile sidebar */
+  .mobile-sidebar {
+    background: linear-gradient(180deg, 
+      hsl(245 35% 10%) 0%, 
+      hsl(250 30% 12%) 50%, 
+      hsl(245 35% 10%) 100%
+    );
+    border-right: 1px solid hsl(250 25% 18%);
+    backdrop-filter: blur(20px);
+    box-shadow: 
+      4px 0 20px rgba(0, 0, 0, 0.3),
+      inset -1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Mobile header gradient */
+  .mobile-header {
+    background: linear-gradient(135deg, 
+      hsl(245 35% 10% / 0.95) 0%, 
+      hsl(250 30% 12% / 0.95) 100%
+    );
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid hsl(250 25% 18%);
+    box-shadow: 
+      0 2px 10px rgba(0, 0, 0, 0.2),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Glassmorphism effect for overlay */
+  .mobile-overlay {
+    background: rgba(16, 15, 30, 0.8);
+    backdrop-filter: blur(10px);
+  }
+  
+  /* Message bubble gradients */
+  .user-message {
+    background: linear-gradient(135deg, 
+      hsl(260 70% 50%) 0%, 
+      hsl(270 80% 60%) 50%, 
+      hsl(280 70% 55%) 100%
+    );
+    border: 1px solid hsl(260 60% 40%);
+    color: white;
+    box-shadow: 
+      0 4px 15px rgba(139, 69, 255, 0.25),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+  
+  .bot-message {
+    background: linear-gradient(135deg, 
+      hsl(250 25% 12%) 0%, 
+      hsl(255 30% 15%) 50%, 
+      hsl(250 25% 12%) 100%
+    );
+    border: 1px solid hsl(250 25% 20%);
+    box-shadow: 
+      0 4px 15px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Animated gradient for special elements */
+  .animated-gradient {
+    background: linear-gradient(45deg, 
+      hsl(260 70% 50%), 
+      hsl(270 80% 60%), 
+      hsl(280 70% 55%), 
+      hsl(290 80% 60%)
+    );
+    background-size: 400% 400%;
+    animation: gradientShift 3s ease infinite;
+  }
+  
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  /* Mobile responsive text */
+  @media (max-width: 768px) {
+    .chat-container {
+      max-width: 100%;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+  }
+}
