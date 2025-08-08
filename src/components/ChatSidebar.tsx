@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
+import { apiClient } from "../lib/api";
 import { 
   MessageSquare, 
   Info, 
@@ -73,14 +74,11 @@ export function ChatSidebar({
   ];
 
   useEffect(() => {
-    // Fetch system info from backend
+    // Fetch system info from backend using apiClient
     const fetchSystemInfo = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/system-info');
-        if (response.ok) {
-          const info = await response.json();
-          setSystemInfo(info);
-        }
+        const info = await apiClient.getSystemInfo();
+        setSystemInfo(info);
       } catch (error) {
         console.error('Failed to fetch system info:', error);
         // Fallback system info

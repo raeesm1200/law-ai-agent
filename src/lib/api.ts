@@ -7,9 +7,9 @@ const getAPIBaseURL = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // If we're on Render (onrender.com domain), use the known backend URL
+  // If we're on Render (onrender.com domain), use the Modal backend URL
   if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-    return 'https://law-ai-agent.onrender.com';
+    return 'https://cybophee2001--legal-rag-chatbot-api-api-server.modal.run';
   }
   
   // Development fallback

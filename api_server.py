@@ -52,6 +52,7 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "https://law-ai-agent-1.onrender.com",  # Your frontend URL
         "https://*.render.com",
+        "https://*.modal.run",  # Allow Modal domains
         "https://*.vercel.app",
         "https://*.netlify.app"
     ],
