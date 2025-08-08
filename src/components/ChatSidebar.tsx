@@ -116,7 +116,7 @@ export function ChatSidebar({
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2 mb-3">
           <Scale className="h-5 w-5 text-sidebar-foreground" />
-          <span className="text-sm text-sidebar-foreground">Legal AI Assistant</span>
+          <span className="text-sm text-sidebar-foreground">LAW AGENT AI</span>
         </div>
         
         {/* Country Selection */}

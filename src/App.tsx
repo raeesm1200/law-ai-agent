@@ -133,7 +133,7 @@ function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold text-white">Legal AI Assistant</h1>
+          <h1 className="text-lg font-semibold text-white">LAW AGENT AI</h1>
         </div>
         <button 
           onClick={handleNewConversation}

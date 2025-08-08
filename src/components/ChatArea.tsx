@@ -46,7 +46,7 @@ export function ChatArea({ messages, onSendMessage, isLoading }: ChatAreaProps) 
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <h3 className="text-xl text-foreground mb-3 font-semibold">Legal AI Assistant</h3>
+                        <h3 className="text-xl text-foreground mb-3 font-semibold">LAW AGENT AI</h3>
                         <p className="text-muted-foreground leading-relaxed">
                           I can help you understand legal concepts, review documents, and answer questions about various areas of law including contracts, employment, intellectual property, and corporate matters.
                         </p>
