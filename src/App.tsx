@@ -24,8 +24,17 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState("italy");
+  const [selectedLanguage, setSelectedLanguage] = useState("english"); // NEW
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
+
+  const clearBackendHistory = async () => {
+    try {
+      await fetch("/api/clear-history", { method: "POST" });
+    } catch (e) {
+      console.warn("Failed to clear backend chat history:", e);
+    }
+  };
 
   const handleSendMessage = async (message: string) => {
     let currentConversationId = activeConversationId;
@@ -63,8 +72,8 @@ function App() {
 
     try {
       // Call FastAPI backend
-      console.log('Sending message to backend:', message, 'Country:', selectedCountry);
-      const response = await apiClient.sendMessage(message, selectedCountry);
+      console.log('Sending message to backend:', message, 'Country:', selectedCountry, 'Language:', selectedLanguage);
+      const response = await apiClient.sendMessage(message, selectedCountry, selectedLanguage); // UPDATED
       console.log('Received response from backend:', response);
       
       const botMessage: Message = {
@@ -98,7 +107,30 @@ function App() {
     }
   };
 
-  const handleNewConversation = () => {
+  const handleLanguageChange = async (newLanguage: string) => {
+    if (newLanguage === selectedLanguage) return;
+
+    const activeConv = conversations.find(c => c.id === activeConversationId);
+
+    if (activeConv && activeConv.messages && activeConv.messages.length > 0) {
+      const newConversation: Conversation = {
+        id: `${Date.now()}`,
+        title: "New Legal Consultation",
+        lastMessage: "",
+        timestamp: "now",
+        messages: []
+      };
+      setConversations(prev => [newConversation, ...prev]);
+      setActiveConversationId(newConversation.id);
+
+      // Clear backend chat history
+      await clearBackendHistory();
+    }
+
+    setSelectedLanguage(newLanguage);
+  };
+
+  const handleNewConversation = async () => {
     const newConversation: Conversation = {
       id: `${Date.now()}`,
       title: "New Legal Consultation",
@@ -109,6 +141,9 @@ function App() {
 
     setConversations(prev => [newConversation, ...prev]);
     setActiveConversationId(newConversation.id);
+
+    // Clear backend chat history
+    await clearBackendHistory();
   };
 
   const handleDeleteConversation = (conversationId: string) => {
@@ -134,6 +169,10 @@ function App() {
             </svg>
           </button>
           <h1 className="text-lg font-semibold text-white">LAW AGENT AI</h1>
+          {/* Show selected language */}
+          <span className="ml-2 px-2 py-1 rounded bg-primary/80 text-white text-xs">
+            {selectedLanguage === "italian" ? "🇮🇹 Italian" : "🇺🇸 English"}
+          </span>
         </div>
         <button 
           onClick={handleNewConversation}
@@ -157,6 +196,8 @@ function App() {
           onClose={() => {}}
           onCountryChange={setSelectedCountry}
           selectedCountry={selectedCountry}
+          onLanguageChange={handleLanguageChange}
+          selectedLanguage={selectedLanguage}
         />
       </div>
 
@@ -184,6 +225,8 @@ function App() {
               onClose={() => setIsSidebarOpen(false)}
               onCountryChange={setSelectedCountry}
               selectedCountry={selectedCountry}
+              onLanguageChange={handleLanguageChange}
+              selectedLanguage={selectedLanguage}
             />
           </div>
         </div>
@@ -191,10 +234,11 @@ function App() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col pt-16 lg:pt-0">
-        <ChatArea 
+        <ChatArea
           messages={activeConversation?.messages || []}
           onSendMessage={handleSendMessage}
           isLoading={isLoading}
+          selectedLanguage={selectedLanguage}
         />
       </div>
     </div>

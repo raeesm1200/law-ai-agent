@@ -24,6 +24,7 @@ from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
 from langchain_groq import ChatGroq
 from langchain_community.vectorstores import Qdrant
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 
 # Qdrant imports
 from qdrant_client import QdrantClient
@@ -41,8 +42,10 @@ class LegalRAGChatbot:
     and uses Groq's Llama model to provide legal assistance.
     """
     
-    def __init__(self):
+    def __init__(self, qdrant_collection: str = "law_chunks", language: str = "english"):
         """Initialize the chatbot with all necessary components."""
+        self.qdrant_collection = qdrant_collection
+        self.language = language
         self.setup_config()
         self.setup_llm()
         self.setup_embeddings()
@@ -65,10 +68,8 @@ class LegalRAGChatbot:
         # Qdrant Configuration
         self.qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
-        self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "law_chunks")
         
-        # Model Configuration - Keep original model for embedding compatibility
-        # Use lazy loading and other optimizations to manage memory
+        # Model Configuration
         self.embedding_model_name = "intfloat/multilingual-e5-base"
         self.llm_model_name = "llama-3.3-70b-versatile"  
         
@@ -91,40 +92,24 @@ class LegalRAGChatbot:
             raise
             
     def setup_embeddings(self):
-        """Initialize the embedding model - optimized for memory with lazy loading."""
+        """Initialize the embedding model."""
         try:
-            # Use lazy loading - model loads only when first used
-            class OptimizedEmbeddings:
-                def __init__(self, model_name):
-                    self.model_name = model_name
-                    self._model = None
-                
-                @property
-                def model(self):
-                    if self._model is None:
-                        from sentence_transformers import SentenceTransformer
-                        self._model = SentenceTransformer(
-                            self.model_name, device='cpu'
-                        )
-                    return self._model
-                
-                def embed_documents(self, texts):
-                    return self.model.encode(texts, normalize_embeddings=True)
-                
-                def embed_query(self, text):
-                    return self.model.encode(
-                        [text], normalize_embeddings=True
-                    )[0]
+            self.embeddings = SentenceTransformerEmbeddings(
+                model_name=self.embedding_model_name,
+                model_kwargs={'device': 'cpu'},
+                encode_kwargs={
+                    'normalize_embeddings': True,
+                    'convert_to_numpy': True
+                }
+            )
             
-            self.embeddings = OptimizedEmbeddings(self.embedding_model_name)
-            # Set sentence_transformer to use the same lazy-loaded instance
-            self.sentence_transformer = self.embeddings
+            # Also initialize the direct sentence transformer for query embedding
+            from sentence_transformers import SentenceTransformer
+            self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
             
-            print(f"{Fore.GREEN}✅ Embeddings configured (lazy loading): "
-                  f"{self.embedding_model_name}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Embeddings initialized: {self.embedding_model_name}{Style.RESET_ALL}")
         except Exception as e:
-            print(f"{Fore.RED}❌ Failed to configure embeddings: "
-                  f"{e}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ Failed to initialize embeddings: {e}{Style.RESET_ALL}")
             raise
             
     def setup_vector_store(self):
@@ -176,11 +161,12 @@ class LegalRAGChatbot:
         """Set up the prompt templates for the RAG system."""
         
         # System prompt for legal assistance
-        self.system_prompt = """You are a knowledgeable legal assistant specializing in Italian law. 
+        self.system_prompt_en = """
+        You are a knowledgeable legal assistant specializing in Italian law. 
 Your role is to provide accurate, helpful, and well-reasoned legal information based on the provided legal documents.
 
 GREETING HANDLING:
-If the user greets you (hello, hi, good morning, etc.), respond warmly and ask what legal information they need help with and if he doesn't then skip to answering. For example:
+If the user greets you (hello, hi, good morning, etc.), respond warmly and ask what legal information they need help with and if he doesn't greet then skip to answering. For example:
 "Hello! I'm your Italian Legal Assistant. I can help you with questions about Italian law, including contracts, employment law, corporate regulations, civil procedures, and more. What legal information can I assist you with today?"
 
 IMPORTANT GUIDELINES:
@@ -223,7 +209,59 @@ FORMATTING RULES:
 - For multiple sources, enter next line
 - Always place URLs on separate lines starting with 🔗 for better clickability
 
-Remember: You're providing legal information, not legal advice. Always include complete source citations."""
+Remember: You're providing legal information, not legal advice. Always include complete source citations.
+"""
+
+        self.system_prompt_it = """
+        Tu sei un assistente legale esperto in diritto italiano.
+Il tuo ruolo è fornire informazioni legali accurate, utili e ben motivate basandoti sui documenti legali forniti.
+
+GESTIONE DEI SALUTI:
+Se l’utente ti saluta (ciao, buongiorno, salve, ecc.), rispondi cordialmente e chiedi di quale informazione legale ha bisogno. Se non ti saluta, passa direttamente alla risposta. Ad esempio:
+«Ciao! Sono il tuo Assistente Legale Italiano. Posso aiutarti con domande sul diritto italiano, inclusi contratti, diritto del lavoro, normativa societaria, procedura civile e altro ancora. Quale informazione legale posso fornirti oggi?»
+
+LINEE GUIDA IMPORTANTI:
+Basati principalmente sul contesto legale fornito
+Se il contesto non contiene informazioni sufficienti, indica chiaramente questa limitazione
+CITA SEMPRE le fonti legali con tutti i dettagli completi, inclusi:
+Nome della legge (in italiano e in inglese, se disponibile)
+Numero e titolo dell’articolo
+URL della fonte ufficiale
+
+Fornisci spiegazioni strutturate e chiare, usando titoli semplici (senza markdown)
+Usa un linguaggio professionale ma comprensibile
+Se ti viene chiesta una procedura specifica, cita gli articoli o le disposizioni pertinenti
+Distingui tra fatti giuridici e interpretazioni
+Ricorda all’utente di consultare un professionista legale qualificato per consulenze specifiche
+
+STRUTTURA DELLA RISPOSTA:
+Risposta breve e diretta alla domanda
+Spiegazione dettagliata basata sul contesto legale
+
+Fonti legali:
+Per ogni documento pertinente, includi:
+• Nome della legge: [Italian law name]
+• Nome in inglese: [English translation if available]
+• Articolo: [Article number and title]
+• Source URL: [Official source link]
+Implicazioni o considerazioni pratiche
+
+Avvertenza sulla necessità di consultare professionisti legali
+
+FORMATO DELLA CITAZIONE:
+Indica sempre le fonti legali nel formato:
+📚 Fonte: [Law Name] | Articolo [Number]: [Title] | [English Law Name]
+🔗 Fonte ufficiale: [URL]
+
+REGOLE DI FORMATTAZIONE:
+NON usare formattazioni markdown come ## o **
+Usa titoli semplici di testo
+Usa punti elenco con • o -
+Mantieni una formattazione pulita e leggibile
+Per più fonti, vai a capo
+Inserisci sempre gli URL su una riga separata che inizi con 🔗 per facilitarne il click
+
+Ricorda: stai fornendo informazioni legali, non consulenza legale. Includi sempre citazioni complete delle fonti."""
 
         # RAG prompt template with chat history
         self.rag_template = """System: {system_prompt}
@@ -355,11 +393,13 @@ Legal Assistant Response:"""
     def search_documents(self, query: str, k: int = 5) -> List[Document]:
         """Search for relevant documents in the vector store."""
         try:
-            # Use optimized embeddings to create query embedding
+            print(f"{Fore.CYAN}🔎 Using collection for retrieval: {self.qdrant_collection}{Style.RESET_ALL}")  # <-- Add this line
+
+            # Use direct sentence transformer to create query embedding
             formatted_query = f"query: {query.strip()}"
-            query_embedding = self.embeddings.embed_query(
-                formatted_query
-            ).tolist()
+            query_embedding = self.sentence_transformer.encode(formatted_query, convert_to_numpy=True).tolist()
+            
+            
             
             search_results = self.qdrant_client.search(
                 collection_name=self.qdrant_collection,
@@ -418,9 +458,21 @@ Legal Assistant Response:"""
         if len(self.chat_history) > self.max_history_length:
             self.chat_history = self.chat_history[-self.max_history_length:]
     
-    def get_response(self, question: str) -> str:
+    def clear_history(self):
+        """Clear the chat history."""
+        self.chat_history = []
+
+    def get_response(self, question: str, collection: str = "law_chunks", language: str = "english") -> str:
         """Get a response from the RAG chatbot."""
         try:
+            # Switch collection if needed
+            if collection != self.qdrant_collection:
+                self.qdrant_collection = collection
+                self.setup_vector_store()
+
+            # Update language for this response
+            self.language = language
+            print(f"{Fore.YELLOW}🌐 Using language for response: {self.language}{Style.RESET_ALL}")
             print(f"{Fore.YELLOW}🔍 Searching for relevant legal documents...{Style.RESET_ALL}")
             
             # First, test document retrieval directly
@@ -431,14 +483,26 @@ Legal Assistant Response:"""
             
             print(f"{Fore.GREEN}✅ Found {len(docs)} relevant documents{Style.RESET_ALL}")
             
+            # Determine the correct system prompt based on language
+            if self.language.lower() == "italian":
+                self.system_prompt = self.system_prompt_it
+            else:
+                self.system_prompt = self.system_prompt_en
+            
             # Get response from RAG chain
             response = self.rag_chain.invoke(question)
             
             # Add to chat history
             self.add_to_history(question, response)
-            
+
+            # Print chat history after each response
+            print(f"\n{Fore.CYAN}📚 Current Conversation History:{Style.RESET_ALL}")
+            for i, exchange in enumerate(self.chat_history, 1):
+                print(f"{Fore.YELLOW}Q{i}: {exchange['question']}{Style.RESET_ALL}")
+                print(f"{Fore.GREEN}A{i}: {exchange['answer'][:300]}...{Style.RESET_ALL}")
+
             return response
-            
+
         except Exception as e:
             error_msg = f"❌ Error generating response: {e}"
             print(f"{Fore.RED}{error_msg}{Style.RESET_ALL}")

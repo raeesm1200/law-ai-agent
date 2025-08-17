@@ -14,9 +14,10 @@ interface ChatAreaProps {
   messages: Message[];
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
+  selectedLanguage: string; // Add this line
 }
 
-export function ChatArea({ messages, onSendMessage, isLoading }: ChatAreaProps) {
+export function ChatArea({ messages, onSendMessage, isLoading, selectedLanguage }: ChatAreaProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,17 +47,27 @@ export function ChatArea({ messages, onSendMessage, isLoading }: ChatAreaProps) 
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <h3 className="text-xl text-foreground mb-3 font-semibold">LAW AGENT AI</h3>
+                        <h3 className="text-xl text-foreground mb-3 font-semibold">
+                          {selectedLanguage === "italian" ? "AGENTE LEGALE AI" : "LAW AGENT AI"}
+                        </h3>
                         <p className="text-muted-foreground leading-relaxed">
-                          I can help you understand legal concepts, review documents, and answer questions about various areas of law including contracts, employment, intellectual property, and corporate matters.
+                          {selectedLanguage === "italian"
+                            ? "Posso aiutarti a comprendere concetti giuridici, esaminare documenti e rispondere a domande su vari ambiti del diritto, inclusi contratti, lavoro, proprietà intellettuale e diritto societario."
+                            : "I can help you understand legal concepts, review documents, and answer questions about various areas of law including contracts, employment, intellectual property, and corporate matters."
+                          }
                         </p>
                       </div>
                       <div className="text-xs text-muted-foreground mobile-card border border-border/50 p-4 rounded-xl shadow-sm">
                         <div className="flex items-start gap-2">
                           <span className="text-amber-400 mt-0.5">⚠️</span>
                           <div>
-                            <strong className="text-foreground">Important Disclaimer:</strong> This AI provides general legal information for educational purposes only. 
-                            It does not constitute legal advice. Please consult with a qualified attorney for specific legal matters.
+                            <strong className="text-foreground">
+                              {selectedLanguage === "italian" ? "Importante Disclaimer:" : "Important Disclaimer:"}
+                            </strong>{" "}
+                            {selectedLanguage === "italian"
+                              ? "Questa IA fornisce solo informazioni legali generali a scopo educativo. Non costituisce consulenza legale. Si prega di consultare un avvocato qualificato per questioni legali specifiche."
+                              : "This AI provides general legal information for educational purposes only. It does not constitute legal advice. Please consult with a qualified lawyer for specific legal matters."
+                            }
                           </div>
                         </div>
                       </div>
@@ -91,7 +102,11 @@ export function ChatArea({ messages, onSendMessage, isLoading }: ChatAreaProps) 
 
       {/* Fixed Input Area - This stays at the bottom */}
       <div className="flex-shrink-0 border-t border-border/60 mobile-card backdrop-blur">
-        <ChatInput onSendMessage={onSendMessage} disabled={isLoading} />
+        <ChatInput
+          onSendMessage={onSendMessage}
+          disabled={isLoading}
+          selectedLanguage={selectedLanguage}
+        />
       </div>
     </div>
   );

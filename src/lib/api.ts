@@ -21,6 +21,7 @@ const API_BASE_URL = getAPIBaseURL();
 export interface ChatMessage {
   message: string;
   country?: string;
+  language?: string; // NEW
 }
 
 export interface ChatResponse {
@@ -36,9 +37,9 @@ class ApiClient {
     },
   });
 
-  async sendMessage(message: string, country: string = "italy"): Promise<ChatResponse> {
+  async sendMessage(message: string, country: string = "italy", language: string = "english"): Promise<ChatResponse> { // UPDATED
     try {
-      const response = await this.client.post('/api/chat', { message, country });
+      const response = await this.client.post('/api/chat', { message, country, language }); // UPDATED
       return response.data;
     } catch (error) {
       console.error('API Error:', error);

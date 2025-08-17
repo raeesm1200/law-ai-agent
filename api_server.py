@@ -65,6 +65,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     country: Optional[str] = "italy"
+    language: Optional[str] = "english"  # Add language field
 
 class ChatResponse(BaseModel):
     response: str
@@ -93,33 +94,32 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     
     try:
-        # Handle different countries
-        if request.country == "italy":
-            # Use the existing Italian legal RAG chatbot
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, chatbot.get_response, request.message)
+        language = (request.language or "english").lower()
+        if language == "italian":
+            collection = "law_chunks_italian_language"
         else:
-            # For other countries, provide a placeholder response
-            country_names = {
-                "usa": "United States",
-                "uk": "United Kingdom", 
-                "france": "France",
-                "germany": "Germany",
-                "spain": "Spain",
-                "canada": "Canada",
-                "australia": "Australia"
-            }
-            country_name = country_names.get(request.country, request.country.title())
-            response = f"I apologize, but I currently only have access to Italian legal documents and laws. For {country_name} legal information, I recommend consulting with a qualified attorney in that jurisdiction. My knowledge base is specifically trained on Italian legal matters including contracts, employment law, corporate regulations, and civil procedures."
-        
+            collection = "law_chunks"
+
+        # Update chatbot's collection and language for this request
+        chatbot.qdrant_collection = collection
+        chatbot.language = language
+
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            chatbot.get_response,
+            request.message,
+            collection,
+            language
+        )
         return ChatResponse(
             response=response,
-            conversation_id=None  # Could implement conversation tracking later
+            conversation_id=None
         )
-    
     except Exception as e:
         print(f"❌ Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app.get("/api/system-info")
 async def get_system_info():
@@ -186,6 +186,14 @@ async def search_documents_endpoint(query: str, limit: int = 5):
     except Exception as e:
         print(f"❌ Error in search endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/clear-history")
+async def clear_history_endpoint():
+    """Clear the chatbot's conversation history."""
+    if not chatbot:
+        raise HTTPException(status_code=503, detail="Chatbot not initialized")
+    chatbot.clear_history()
+    return {"status": "cleared"}
 
 @app.get("/")
 async def root():

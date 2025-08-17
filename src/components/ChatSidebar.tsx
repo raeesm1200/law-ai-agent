@@ -42,6 +42,8 @@ interface ChatSidebarProps {
   onClose?: () => void;
   onCountryChange?: (country: string) => void;
   selectedCountry?: string;
+  onLanguageChange?: (language: string) => void; // NEW
+  selectedLanguage?: string; // NEW
 }
 
 export function ChatSidebar({ 
@@ -53,24 +55,41 @@ export function ChatSidebar({
   isMobile = false,
   onClose = () => {},
   onCountryChange = () => {},
-  selectedCountry: propSelectedCountry = "italy"
+  selectedCountry: propSelectedCountry = "italy",
+  onLanguageChange = () => {}, // NEW
+  selectedLanguage = "english" // FIXED
 }: ChatSidebarProps) {
   const [showSystemInfo, setShowSystemInfo] = useState(false);
   const [systemInfo, setSystemInfo] = useState<any>(null);
   const [selectedCountry, setSelectedCountry] = useState(propSelectedCountry);
+  // const [selectedLanguage, setSelectedLanguage] = useState(propSelectedLanguage); // NEW
 
   // Update local state when prop changes
   useEffect(() => {
     setSelectedCountry(propSelectedCountry);
   }, [propSelectedCountry]);
 
+  // useEffect(() => {
+  //   setSelectedLanguage(propSelectedLanguage);
+  // }, [propSelectedLanguage]);
+
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
     onCountryChange(country);
   };
 
+  const handleLanguageChange = (language: string) => {
+    // setSelectedLanguage(language);
+    onLanguageChange(language);
+  };
+
   const countries = [
     { value: "italy", label: "🇮🇹 Italy", flag: "🇮🇹" },
+  ];
+
+  const languages = [
+    { value: "english", label: "🇺🇸 English", flag: "🇺🇸" },
+    { value: "italian", label: "🇮🇹 Italian", flag: "🇮🇹" },
   ];
 
   useEffect(() => {
@@ -143,13 +162,39 @@ export function ChatSidebar({
           </Select>
         </div>
 
+        {/* Language Selection - NEW */}
+        <div className="mb-3">
+          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                <div className="flex items-center gap-2">
+                  <span role="img" aria-label={languages.find(l => l.value === selectedLanguage)?.label || "Language"}>
+                    {languages.find(l => l.value === selectedLanguage)?.flag}
+                  </span>
+                  {languages.find(l => l.value === selectedLanguage)?.label || "Select Language"}
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {languages.map((language) => (
+                <SelectItem key={language.value} value={language.value}>
+                  <div className="flex items-center gap-2">
+                    <span>{language.flag}</span>
+                    <span>{language.label.replace(/^🇼🇼 /, '')}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <Button 
           onClick={onNewConversation}
           className={`w-full justify-start gap-2 ${isMobile ? 'mobile-button text-white' : ''}`}
           variant="default"
         >
           <Plus className="h-4 w-4" />
-          New Consultation
+          {selectedLanguage === "italian" ? "Nuova Consultazione" : "New Consultation"}
         </Button>
       </div>
 
@@ -157,7 +202,7 @@ export function ChatSidebar({
       <ScrollArea className="flex-1 p-2">
         <div className="space-y-1">
           <div className="px-2 py-1 text-xs text-sidebar-foreground/70 uppercase tracking-wide">
-            Recent Consultations
+            {selectedLanguage === "italian" ? "Consultazioni Recenti" : "Recent Consultations"}
           </div>
           {conversations.map((conversation) => (
             <div key={conversation.id} className="group relative">
@@ -212,24 +257,35 @@ export function ChatSidebar({
           onClick={() => setShowSystemInfo(!showSystemInfo)}
         >
           <Info className="h-4 w-4" />
-          System Information
+          {selectedLanguage === "italian" ? "Informazioni di sistema" : "System Information"}
         </Button>
         {showSystemInfo && systemInfo && (
           <div className="px-4 py-2 text-xs text-sidebar-foreground/70 space-y-1 bg-sidebar-accent rounded-md">
             <div>Model: {systemInfo.model}</div>
-            <div>Knowledge Base: {systemInfo.knowledge_base}</div>
-            <div>Status: {systemInfo.status}</div>
+            <div>
+              {selectedLanguage === "italian" ? "Base di conoscenza" : "Knowledge Base"}: {systemInfo.knowledge_base}
+            </div>
+            <div>
+              {selectedLanguage === "italian" ? "Stato" : "Status"}: {systemInfo.status}
+            </div>
             {systemInfo.embedding_model && (
-              <div>Embeddings: {systemInfo.embedding_model}</div>
+              <div>
+                {selectedLanguage === "italian" ? "Embeddings" : "Embeddings"}: {systemInfo.embedding_model}
+              </div>
             )}
             <div className="pt-2 text-xs text-destructive">
-              ⚠️ Not a substitute for legal advice
+              {selectedLanguage === "italian"
+                ? "⚠️ Non è un sostituto della consulenza legale"
+                : "⚠️ Not a substitute for legal advice"}
             </div>
           </div>
         )}
         <div className="px-3 py-2 text-xs text-sidebar-foreground/50 bg-destructive/10 rounded-md">
-          <strong>Disclaimer:</strong> This AI provides general legal information only. 
-          Always consult a qualified attorney for legal advice.
+          <strong>{selectedLanguage === "italian" ? "Disclaimer:" : "Disclaimer:"}</strong>{" "}
+          {selectedLanguage === "italian"
+            ? "Questa IA fornisce solo informazioni legali generali. Consulta sempre un avvocato qualificato per una consulenza legale."
+            : "This AI provides general legal information only. Always consult a qualified lawyer for legal advice."
+          }
         </div>
       </div>
     </div>
