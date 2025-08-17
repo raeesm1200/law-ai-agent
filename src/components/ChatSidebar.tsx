@@ -84,12 +84,12 @@ export function ChatSidebar({
   };
 
   const countries = [
-    { value: "italy", label: "🇮🇹 Italy", flag: "🇮🇹" },
+    { value: "italy", label: "🇮🇹 Italy", flag: "" },
   ];
 
   const languages = [
-    { value: "english", label: "🇺🇸 English", flag: "🇺🇸" },
-    { value: "italian", label: "🇮🇹 Italian", flag: "🇮🇹" },
+    { value: "english", label: "English", flag: "" },
+    { value: "italian", label: "Italian", flag: "" },
   ];
 
   useEffect(() => {
