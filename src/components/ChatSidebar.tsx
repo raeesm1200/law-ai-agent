@@ -8,7 +8,6 @@ import {
   Plus, 
   MoreHorizontal,
   Trash2,
-  Scale,
   Globe
 } from "lucide-react";
 import {
@@ -134,7 +133,7 @@ export function ChatSidebar({
       {/* Header */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2 mb-3">
-          <Scale className="h-5 w-5 text-sidebar-foreground" />
+          <img src="/onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <span className="text-sm text-sidebar-foreground">LAW AGENT AI</span>
         </div>
         

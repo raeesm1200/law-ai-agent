@@ -168,6 +168,7 @@ function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+          <img src="/onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <h1 className="text-lg font-semibold text-white">LAW AGENT AI</h1>
           {/* Show selected language */}
           <span className="ml-2 px-2 py-1 rounded bg-primary/80 text-white text-xs">
