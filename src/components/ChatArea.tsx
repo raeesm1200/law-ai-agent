@@ -40,8 +40,13 @@ export function ChatArea({ messages, onSendMessage, isLoading, selectedLanguage 
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center min-h-[calc(100vh-240px)] text-center">
                   <div className="space-y-6 max-w-sm mx-auto px-4">
-                    <div className="w-20 h-20 mx-auto mobile-card rounded-2xl flex items-center justify-center shadow-sm animated-gradient">
+                    <div className="w-20 h-20 mx-auto mobile-card rounded-2xl flex items-center justify-center shadow-sm animated-gradient relative">
                       <img src="/onir-logo.png" alt="ONIR Logo" className="w-12 h-12 object-contain" />
+                      <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16l-3-9m3 9l3-9" />
+                        </svg>
+                      </div>
                     </div>
                     <div className="space-y-4">
                       <div>
