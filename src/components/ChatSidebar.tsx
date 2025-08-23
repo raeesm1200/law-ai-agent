@@ -204,46 +204,50 @@ export function ChatSidebar({
             {selectedLanguage === "italian" ? "Consultazioni Recenti" : "Recent Consultations"}
           </div>
           {conversations.map((conversation) => (
-            <div key={conversation.id} className="group relative flex items-center">
-              <Button
-                variant={activeConversationId === conversation.id ? "secondary" : "ghost"}
-                className="flex-1 justify-start text-left h-auto p-3"
-                onClick={() => onSelectConversation(conversation.id)}
-              >
-                <div className="flex items-start gap-2 w-full">
-                  <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate">{conversation.title}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {conversation.lastMessage}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {conversation.timestamp}
+            <div key={conversation.id} className="group relative flex items-stretch w-full min-w-0">
+              <div className="flex-1 min-w-0">
+                <Button
+                  variant={activeConversationId === conversation.id ? "secondary" : "ghost"}
+                  className="w-full justify-start text-left h-auto p-3"
+                  onClick={() => onSelectConversation(conversation.id)}
+                >
+                  <div className="flex items-start gap-2 w-full">
+                    <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{conversation.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {conversation.lastMessage}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {conversation.timestamp}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="ml-2 h-6 w-6 flex items-center justify-center rounded hover:bg-muted focus:outline-none"
-                    title="Conversation options"
-                    tabIndex={0}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
-                    className="text-destructive"
-                    onClick={() => onDeleteConversation(conversation.id)}
-                  >
-                    <Trash2 className="h-3 w-3 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </Button>
+              </div>
+              <div className="flex-shrink-0 flex items-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="ml-2 h-6 w-6 flex items-center justify-center rounded hover:bg-muted focus:outline-none"
+                      title="Conversation options"
+                      tabIndex={0}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      className="text-destructive"
+                      onClick={() => onDeleteConversation(conversation.id)}
+                    >
+                      <Trash2 className="h-3 w-3 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           ))}
         </div>
