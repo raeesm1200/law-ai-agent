@@ -204,10 +204,10 @@ export function ChatSidebar({
             {selectedLanguage === "italian" ? "Consultazioni Recenti" : "Recent Consultations"}
           </div>
           {conversations.map((conversation) => (
-            <div key={conversation.id} className="group relative">
+            <div key={conversation.id} className="group relative flex items-center">
               <Button
                 variant={activeConversationId === conversation.id ? "secondary" : "ghost"}
-                className="w-full justify-start text-left h-auto p-3 pr-8"
+                className="flex-1 justify-start text-left h-auto p-3"
                 onClick={() => onSelectConversation(conversation.id)}
               >
                 <div className="flex items-start gap-2 w-full">
@@ -225,13 +225,14 @@ export function ChatSidebar({
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  <button
+                    type="button"
+                    className="ml-2 h-6 w-6 flex items-center justify-center rounded hover:bg-muted focus:outline-none"
+                    title="Conversation options"
+                    tabIndex={0}
                   >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem 
