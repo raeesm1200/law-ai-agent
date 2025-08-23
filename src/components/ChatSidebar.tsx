@@ -208,17 +208,18 @@ export function ChatSidebar({
               <div className="flex-1 min-w-0">
                 <Button
                   variant={activeConversationId === conversation.id ? "secondary" : "ghost"}
-                  className="w-full justify-start text-left h-auto p-3"
+                  className="w-full justify-start text-left h-auto p-3 max-w-full"
                   onClick={() => onSelectConversation(conversation.id)}
+                  style={{ maxWidth: '100%' }}
                 >
-                  <div className="flex items-start gap-2 w-full">
+                  <div className="flex items-start gap-2 w-full max-w-full">
                     <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{conversation.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">
+                    <div className="flex-1 min-w-0 max-w-full">
+                      <div className="truncate max-w-full" title={conversation.title}>{conversation.title}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-full" title={conversation.lastMessage}>
                         {conversation.lastMessage}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground break-words max-w-full" title={conversation.timestamp}>
                         {conversation.timestamp}
                       </div>
                     </div>
