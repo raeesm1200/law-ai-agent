@@ -37,9 +37,14 @@ class ApiClient {
     },
   });
 
-  async sendMessage(message: string, country: string = "italy", language: string = "english"): Promise<ChatResponse> { // UPDATED
+  async sendMessage(
+    message: string,
+    country: string = "italy",
+    language: string = "english",
+    conversation_id?: string // NEW
+  ): Promise<ChatResponse> {
     try {
-      const response = await this.client.post('/api/chat', { message, country, language }); // UPDATED
+      const response = await this.client.post('/api/chat', { message, country, language, conversation_id }); // UPDATED
       return response.data;
     } catch (error) {
       console.error('API Error:', error);

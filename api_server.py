@@ -7,10 +7,11 @@ Serves the existing legal_rag_chatbot.py functionality via REST API
 import os
 import sys
 import asyncio
-from typing import Optional
+from typing import Optional, Dict
 from contextlib import asynccontextmanager
+import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -20,6 +21,7 @@ from legal_rag_chatbot import LegalRAGChatbot
 
 # Global chatbot instance
 chatbot: Optional[LegalRAGChatbot] = None
+chat_histories: Dict[str, list] = {}  # conversation_id -> chat history
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,7 +67,8 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     country: Optional[str] = "italy"
-    language: Optional[str] = "english"  # Add language field
+    language: Optional[str] = "english"
+    conversation_id: Optional[str] = None  # NEW
 
 class ChatResponse(BaseModel):
     response: str
@@ -74,6 +77,9 @@ class ChatResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     message: str
+
+class ClearHistoryRequest(BaseModel):
+    conversation_id: Optional[str] = None
 
 # API Routes
 @app.get("/api/health", response_model=HealthResponse)
@@ -86,13 +92,11 @@ async def health_check():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    """Main chat endpoint"""
     if not chatbot:
         raise HTTPException(status_code=503, detail="Chatbot not initialized")
-    
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
-    
+
     try:
         language = (request.language or "english").lower()
         if language == "italian":
@@ -100,10 +104,15 @@ async def chat_endpoint(request: ChatRequest):
         else:
             collection = "law_chunks"
 
-        # Update chatbot's collection and language for this request
-        chatbot.qdrant_collection = collection
-        chatbot.language = language
+        # Use conversation_id to manage chat history
+        conversation_id = request.conversation_id or "default"
+        if conversation_id not in chat_histories:
+            chat_histories[conversation_id] = []
 
+        # Set chatbot's chat history for this conversation
+        chatbot.chat_history = chat_histories[conversation_id]
+
+        # Get response
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
@@ -112,9 +121,13 @@ async def chat_endpoint(request: ChatRequest):
             collection,
             language
         )
+
+        # Save updated history back to the dict
+        chat_histories[conversation_id] = chatbot.chat_history
+
         return ChatResponse(
             response=response,
-            conversation_id=None
+            conversation_id=conversation_id
         )
     except Exception as e:
         print(f"❌ Error in chat endpoint: {e}")
@@ -188,12 +201,15 @@ async def search_documents_endpoint(query: str, limit: int = 5):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.post("/api/clear-history")
-async def clear_history_endpoint():
-    """Clear the chatbot's conversation history."""
+async def clear_history_endpoint(request: ClearHistoryRequest):
+    """Clear the chatbot's conversation history for a conversation_id and return a new one."""
     if not chatbot:
         raise HTTPException(status_code=503, detail="Chatbot not initialized")
+    # Generate a new conversation ID
+    new_convo_id = str(uuid.uuid4())
+    chat_histories[new_convo_id] = []
     chatbot.clear_history()
-    return {"status": "cleared"}
+    return {"status": "cleared", "conversation_id": new_convo_id}
 
 @app.get("/")
 async def root():

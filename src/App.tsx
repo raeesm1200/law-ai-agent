@@ -18,19 +18,33 @@ interface Conversation {
   messages: Message[];
 }
 
+function getLanguageFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("lang") === "italian" ? "italian" : "english";
+}
+
 function App() {
+  // Use URL param for initial language
+  const [selectedLanguage, setSelectedLanguage] = useState(getLanguageFromUrl());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState("italy");
-  const [selectedLanguage, setSelectedLanguage] = useState("english"); // NEW
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
 
   const clearBackendHistory = async () => {
     try {
-      await fetch("/api/clear-history", { method: "POST" });
+      const res = await fetch("/api/clear-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: activeConversationId }),
+      });
+      const data = await res.json();
+      if (data.conversation_id) {
+        setActiveConversationId(data.conversation_id);
+      }
     } catch (e) {
       console.warn("Failed to clear backend chat history:", e);
     }
@@ -38,20 +52,19 @@ function App() {
 
   const handleSendMessage = async (message: string) => {
     let currentConversationId = activeConversationId;
-    
-    // If no active conversation, create a new one
+
+    // If no active conversation, create a new one and use its ID
     if (!currentConversationId) {
+      currentConversationId = `${Date.now()}`;
       const newConversation: Conversation = {
-        id: `${Date.now()}`,
+        id: currentConversationId,
         title: message.length > 50 ? message.substring(0, 50) + "..." : message,
         lastMessage: "",
         timestamp: "now",
         messages: []
       };
-      
       setConversations(prev => [newConversation, ...prev]);
-      setActiveConversationId(newConversation.id);
-      currentConversationId = newConversation.id;
+      setActiveConversationId(currentConversationId);
     }
 
     const newUserMessage: Message = {
@@ -62,20 +75,39 @@ function App() {
     };
 
     // Update conversation with user message
-    setConversations(prev => prev.map(conv => 
-      conv.id === currentConversationId 
-        ? { ...conv, messages: [...conv.messages, newUserMessage] }
-        : conv
-    ));
+    setConversations(prev => {
+      // If conversation doesn't exist yet (first message), add it
+      const exists = prev.some(conv => conv.id === currentConversationId);
+      if (!exists) {
+        return [
+          {
+            id: currentConversationId!,
+            title: message.length > 50 ? message.substring(0, 50) + "..." : message,
+            lastMessage: "",
+            timestamp: "now",
+            messages: [newUserMessage]
+          },
+          ...prev
+        ];
+      }
+      // Otherwise, update existing
+      return prev.map(conv =>
+        conv.id === currentConversationId
+          ? { ...conv, messages: [...conv.messages, newUserMessage] }
+          : conv
+      );
+    });
 
     setIsLoading(true);
 
     try {
-      // Call FastAPI backend
-      console.log('Sending message to backend:', message, 'Country:', selectedCountry, 'Language:', selectedLanguage);
-      const response = await apiClient.sendMessage(message, selectedCountry, selectedLanguage); // UPDATED
-      console.log('Received response from backend:', response);
-      
+      const response = await apiClient.sendMessage(
+        message,
+        selectedCountry,
+        selectedLanguage,
+        currentConversationId // Pass conversation_id
+      );
+
       const botMessage: Message = {
         id: `${Date.now()}-bot`,
         content: response.response,
@@ -83,13 +115,18 @@ function App() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setConversations(prev => prev.map(conv => 
-        conv.id === currentConversationId 
-          ? { ...conv, messages: [...conv.messages, botMessage], lastMessage: response.response.substring(0, 50) + "..." }
-          : conv
-      ));
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === currentConversationId
+            ? {
+                ...conv,
+                messages: [...conv.messages, botMessage],
+                lastMessage: response.response.substring(0, 50) + "..."
+              }
+            : conv
+        )
+      );
     } catch (error) {
-      console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: `${Date.now()}-error`,
         content: `I apologize, but I'm having trouble connecting to the legal database. Please ensure the backend server is running on http://localhost:8000. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -97,11 +134,13 @@ function App() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setConversations(prev => prev.map(conv => 
-        conv.id === currentConversationId 
-          ? { ...conv, messages: [...conv.messages, errorMessage] }
-          : conv
-      ));
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === currentConversationId
+            ? { ...conv, messages: [...conv.messages, errorMessage] }
+            : conv
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -127,12 +166,17 @@ function App() {
       await clearBackendHistory();
     }
 
-    setSelectedLanguage(newLanguage);
+    // Update the URL with the new language and reload
+    const params = new URLSearchParams(window.location.search);
+    params.set("lang", newLanguage);
+    window.location.search = params.toString();
   };
 
   const handleNewConversation = async () => {
+    // 1. Create a temporary frontend ID
+    const tempId = `${Date.now()}`;
     const newConversation: Conversation = {
-      id: `${Date.now()}`,
+      id: tempId,
       title: "New Legal Consultation",
       lastMessage: "",
       timestamp: "now",
@@ -140,10 +184,28 @@ function App() {
     };
 
     setConversations(prev => [newConversation, ...prev]);
-    setActiveConversationId(newConversation.id);
+    setActiveConversationId(tempId);
 
-    // Clear backend chat history
-    await clearBackendHistory();
+    // 2. Clear backend chat history and get the backend-generated ID
+    try {
+      const res = await fetch("/api/clear-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: tempId }),
+      });
+      const data = await res.json();
+      if (data.conversation_id) {
+        // 3. Update the conversation in state to use the backend ID
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === tempId ? { ...conv, id: data.conversation_id } : conv
+          )
+        );
+        setActiveConversationId(data.conversation_id);
+      }
+    } catch (e) {
+      console.warn("Failed to clear backend chat history:", e);
+    }
   };
 
   const handleDeleteConversation = (conversationId: string) => {
