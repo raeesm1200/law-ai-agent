@@ -25,7 +25,7 @@ function getLanguageFromUrl() {
 
 function App() {
   // Use URL param for initial language
-  const [selectedLanguage, setSelectedLanguage] = useState(getLanguageFromUrl());
+  const [selectedLanguage] = useState(getLanguageFromUrl());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
