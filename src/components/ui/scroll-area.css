@@ -1,0 +1,4 @@
+/* Force display block for children of ScrollAreaPrimitive.Viewport */
+[data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+}
