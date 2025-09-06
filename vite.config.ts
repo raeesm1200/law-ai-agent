@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: './',   // ✅ Add this line
   server: {
     port: 3000,
     proxy: {
@@ -17,7 +17,7 @@ export default defineConfig({
     port: 3000,
     host: true,
     allowedHosts: [
-      'all', // Allow all hosts for Render deployment
+      'all',
       'law-ai-agent-1.onrender.com',
       'legal-rag-chatbot-frontend.onrender.com'
     ],

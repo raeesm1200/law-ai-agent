@@ -133,7 +133,7 @@ export function ChatSidebar({
       {/* Header */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2 mb-3">
-          <img src="/onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
+          <img src="./onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <span className="text-sm text-sidebar-foreground">LAW AGENT AI</span>
         </div>
         

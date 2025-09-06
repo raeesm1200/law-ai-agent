@@ -8,7 +8,7 @@ const getAPIBaseURL = () => {
   }
   
   // If we're on Render (onrender.com domain), use the Modal backend URL
-  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+  if (typeof window !== 'undefined') {
     return 'https://cybophee2001--legal-rag-chatbot-api-api-server.modal.run';
   }
   
