@@ -8,7 +8,9 @@ import {
   Plus, 
   MoreHorizontal,
   Trash2,
-  Globe
+  Globe,
+  LogOut,
+  Crown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,6 +45,15 @@ interface ChatSidebarProps {
   selectedCountry?: string;
   onLanguageChange?: (language: string) => void; // NEW
   selectedLanguage?: string; // NEW
+  onLogout?: () => void; // NEW - Logout function
+  questionsUsed?: number;
+  maxTrial?: number;
+  hasSubscription?: boolean;
+  subscription?: {
+    has_subscription: boolean;
+    status: string;
+    end_date?: string;
+  };
 }
 
 export function ChatSidebar({ 
@@ -56,7 +67,10 @@ export function ChatSidebar({
   onCountryChange = () => {},
   selectedCountry: propSelectedCountry = "italy",
   onLanguageChange = () => {}, // NEW
-  selectedLanguage = "english" // FIXED
+  selectedLanguage = "english", // FIXED
+  onLogout = () => {} // NEW - Logout function
+  , questionsUsed = 0, maxTrial = 20, hasSubscription = false,
+  subscription = null
 }: ChatSidebarProps) {
   const [showSystemInfo, setShowSystemInfo] = useState(false);
   const [systemInfo, setSystemInfo] = useState<any>(null);
@@ -112,8 +126,14 @@ export function ChatSidebar({
     fetchSystemInfo();
   }, []);
 
+  // Derived subscription access: consider subscription "valid" when has_subscription is true
+  // and either there is no end_date (recurring) or the end_date is in the future.
+  const now = new Date();
+  const subscriptionEndDate = subscription?.end_date ? new Date(subscription.end_date) : null;
+  const subscriptionValid = !!(subscription && subscription.has_subscription && (!subscriptionEndDate || subscriptionEndDate > now));
+
   return (
-    <div className={`${isMobile ? 'w-80 mobile-sidebar' : 'w-80'} h-full ${isMobile ? 'backdrop-blur-md' : 'bg-sidebar'} border-r border-sidebar-border flex flex-col ${isMobile ? 'shadow-2xl' : ''}`}>
+    <div className={`${isMobile ? 'w-full max-w-xs mobile-sidebar' : 'w-80'} h-full ${isMobile ? 'backdrop-blur-md' : 'bg-sidebar'} border-r border-sidebar-border flex flex-col min-h-0 ${isMobile ? 'shadow-2xl' : ''}`}>
       {/* Mobile Close Button */}
       {isMobile && (
         <div className="p-2 border-b border-sidebar-border">
@@ -135,6 +155,34 @@ export function ChatSidebar({
         <div className="flex items-center gap-2 mb-3">
           <img src="./onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <span className="text-sm text-sidebar-foreground">LAW AGENT AI</span>
+        </div>
+        {/* Trial indicator / progress bar */}
+        <div className="mb-3">
+          {/* Show trial progress if no valid subscription OR if canceled subscription has expired */}
+          {(!subscriptionValid) ? (
+            <div>
+              <div className="flex items-center justify-between mb-1 text-xs text-muted-foreground/80">
+                <div><strong>Trial</strong></div>
+                <div>{questionsUsed}/{maxTrial} used</div>
+              </div>
+              <div className="w-full bg-border rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 bg-amber-400"
+                  style={{ width: `${Math.min(100, Math.round((questionsUsed / Math.max(1, maxTrial)) * 100))}%` }}
+                />
+              </div>
+            </div>
+          ) : subscription?.status === 'canceled' && subscription?.end_date ? (
+            // Show "Valid till {date}" for canceled subscriptions that haven't expired yet
+            <div className="text-xs text-yellow-400 bg-yellow-400/10 p-2 rounded">
+              <div className="font-semibold">Access until {new Date(subscription.end_date).toLocaleDateString()}</div>
+              <div></div>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 text-xs text-green-400">
+              <span className="px-2 py-1 bg-green-800/20 rounded">Subscribed</span>
+            </div>
+          )}
         </div>
         
         {/* Country Selection */}
@@ -198,7 +246,7 @@ export function ChatSidebar({
       </div>
 
       {/* Conversations */}
-      <ScrollArea className="flex-1 p-2">
+  <ScrollArea className="flex-1 p-2 overflow-auto min-h-0">
         <div className="space-y-1">
           <div className="px-2 py-1 text-xs text-sidebar-foreground/70 uppercase tracking-wide">
             {selectedLanguage === "italian" ? "Consultazioni Recenti" : "Recent Consultations"}
@@ -256,6 +304,19 @@ export function ChatSidebar({
 
       {/* Footer */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        {/* Subscription Button */}
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-2"
+          onClick={() => window.location.href = '/subscription'}
+        >
+          <Crown className="h-4 w-4" />
+          {subscriptionValid 
+            ? (selectedLanguage === "italian" ? "Gestisci Abbonamento" : "Manage Subscription")
+            : (selectedLanguage === "italian" ? "Abbonati" : "Subscribe")
+          }
+        </Button>
+
         <Button 
           variant="ghost" 
           className="w-full justify-start gap-2"
@@ -263,6 +324,16 @@ export function ChatSidebar({
         >
           <Info className="h-4 w-4" />
           {selectedLanguage === "italian" ? "Informazioni di sistema" : "System Information"}
+        </Button>
+        
+        {/* Logout Button */}
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={onLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          {selectedLanguage === "italian" ? "Esci" : "Logout"}
         </Button>
         {showSystemInfo && systemInfo && (
           <div className="px-4 py-2 text-xs text-sidebar-foreground/70 space-y-1 bg-sidebar-accent rounded-md">

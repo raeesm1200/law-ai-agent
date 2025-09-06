@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Route Test</title>
+</head>
+<body>
+    <h1>Testing Routes</h1>
+    <p>Current URL: <span id="currentUrl"></span></p>
+    <p>Current Path: <span id="currentPath"></span></p>
+    <p>Query Parameters: <span id="queryParams"></span></p>
+    
+    <h2>Test Links:</h2>
+    <ul>
+        <li><a href="http://localhost:3000/">Home</a></li>
+        <li><a href="http://localhost:3000/login">Login</a></li>
+        <li><a href="http://localhost:3000/subscription">Subscription</a></li>
+        <li><a href="http://localhost:3000/subscription/success">Success (no params)</a></li>
+        <li><a href="http://localhost:3000/subscription/success?session_id=test123">Success (with params)</a></li>
+    </ul>
+
+    <script>
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('currentPath').textContent = window.location.pathname;
+        document.getElementById('queryParams').textContent = window.location.search;
+    </script>
+</body>
+</html>
