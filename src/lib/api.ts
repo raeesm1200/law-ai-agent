@@ -18,19 +18,13 @@ const getAPIBaseURL = () => {
     console.log('🚀 Production build detected');
     
     // If running on localhost but in production build, still use local backend
-    if (typeof window !== 'undefined') {
-      console.log('🏠 Production build running on localhost');
-      return 'http://localhost:8000';
-    }
-    
-    // If we're on Render (onrender.com domain), use the Modal backend URL
-    if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-      console.log('🌐 Running on Render production server');
-      return 'https://cybophee2001--legal-rag-chatbot-api-api-server.modal.run';
-    }
-    
-    // For other production deployments, try to infer the API URL
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window?.location) {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        console.log('🏠 Production build running on localhost');
+        return 'http://localhost:8000';
+      }
+      
+      // For other production deployments, try to infer the API URL
       const currentHost = window.location.hostname;
       console.log('🌍 Production server detected, hostname:', currentHost);
       

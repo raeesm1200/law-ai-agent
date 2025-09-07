@@ -5,7 +5,6 @@ import { ChatArea } from "./components/ChatArea";
 import { AuthForm } from "./components/AuthForm";
 import { SubscriptionPlans } from "./components/SubscriptionPlans";
 import { SubscriptionSuccess, SubscriptionCancel } from "./components/SubscriptionStatus";
-import { TestSuccess } from "./components/TestSuccess";
 import { Router } from "./components/Router";
 import { apiClient } from "./lib/api";
 import { Alert, AlertDescription } from "./components/ui/alert";
@@ -337,7 +336,6 @@ const ChatApp: React.FC = () => {
           onLogout={logout}
           questionsUsed={user?.questions_used || 0}
           maxTrial={20}
-          hasSubscription={!!subscription?.has_subscription || !!(subscription?.status === 'canceled' && subscription?.end_date && new Date(subscription.end_date) > new Date())}
           subscription={subscription ?? undefined}
         />
       </div>
@@ -371,7 +369,6 @@ const ChatApp: React.FC = () => {
               onLogout={logout}
               questionsUsed={user?.questions_used || 0}
               maxTrial={20}
-              hasSubscription={!!subscription?.has_subscription || !!(subscription?.status === 'canceled' && subscription?.end_date && new Date(subscription.end_date) > new Date())}
               subscription={subscription ?? undefined}
             />
           </div>

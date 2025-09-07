@@ -48,7 +48,6 @@ interface ChatSidebarProps {
   onLogout?: () => void; // NEW - Logout function
   questionsUsed?: number;
   maxTrial?: number;
-  hasSubscription?: boolean;
   subscription?: {
     has_subscription: boolean;
     status: string;
@@ -69,8 +68,8 @@ export function ChatSidebar({
   onLanguageChange = () => {}, // NEW
   selectedLanguage = "english", // FIXED
   onLogout = () => {} // NEW - Logout function
-  , questionsUsed = 0, maxTrial = 20, hasSubscription = false,
-  subscription = null
+  , questionsUsed = 0, maxTrial = 20,
+  subscription = undefined
 }: ChatSidebarProps) {
   const [showSystemInfo, setShowSystemInfo] = useState(false);
   const [systemInfo, setSystemInfo] = useState<any>(null);
