@@ -188,4 +188,3 @@ secrets.json
 
 # Local development files
 .local
-.env.*

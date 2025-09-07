@@ -19,7 +19,8 @@ if (!STRIPE_PUBLISHABLE_KEY) {
   console.error('Missing VITE_STRIPE_PUBLISHABLE_KEY in frontend environment. Set VITE_STRIPE_PUBLISHABLE_KEY in your .env and restart the dev server.');
 }
 
-console.log('Using Stripe publishable key (first 12 chars):', STRIPE_PUBLISHABLE_KEY ? STRIPE_PUBLISHABLE_KEY.slice(0,12) + '...' : 'MISSING');
+// Remove console.log for security - publishable keys should not be logged even partially
+// console.log('Using Stripe publishable key (first 12 chars):', STRIPE_PUBLISHABLE_KEY ? STRIPE_PUBLISHABLE_KEY.slice(0,12) + '...' : 'MISSING');
 
 // Only initialize Stripe if we have a non-empty publishable key. Otherwise stripePromise resolves to null.
 const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : Promise.resolve(null as any);
