@@ -31,7 +31,20 @@ from auth import (
     get_password_hash, verify_password, create_access_token,
     get_current_active_user, check_subscription, ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from stripe_service import stripe_service
+from stripe_service import get_stripe_service
+import logging
+
+
+def require_stripe_service():
+    """Raise a FastAPI HTTPException if stripe_service is not initialized."""
+    try:
+        get_stripe_service()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+logger = logging.getLogger("legal_rag_api")
+# Do not change global logging level here; use debug-level logs so they are hidden by default.
+
 from pydantic import BaseModel
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -109,7 +122,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     
     # Create Stripe customer
     try:
-        stripe_customer = stripe_service.create_customer(
+        require_stripe_service()
+        stripe_customer = get_stripe_service().create_customer(
             email=user_data.email,
             name=user_data.email.split('@')[0]
         )
@@ -170,14 +184,13 @@ async def debug_auth(request: Request, db: Session = Depends(get_db)):
     
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split(' ')[1]
-        debug_info["token_length"] = len(token)
-        debug_info["token_prefix"] = token[:20] + "..." if len(token) > 20 else token
-
+        # Do NOT include token length/prefix or any token material in debug output
         try:
             from auth import verify_token
             email = verify_token(token)
             if email:
                 debug_info["token_valid"] = True
+                # email is OK to return for debugging, but avoid any token data
                 debug_info["user_email"] = email
 
                 user = db.query(User).filter(User.email == email).first()
@@ -186,15 +199,14 @@ async def debug_auth(request: Request, db: Session = Depends(get_db)):
                     debug_info["user_id"] = user.id
                     debug_info["user_active"] = user.is_active
 
-                    # Check subscriptions
+                    # Check subscriptions (only structural data, no secrets)
                     subscriptions = db.query(Subscription).filter(Subscription.user_id == user.id).all()
                     debug_info["subscription_count"] = len(subscriptions)
                     debug_info["active_subscriptions"] = [
                         {
                             "id": sub.id,
                             "status": sub.status,
-                            "plan_type": sub.plan_type,
-                            "stripe_id": sub.stripe_subscription_id
+                            "plan_type": sub.plan_type
                         }
                         for sub in subscriptions if sub.status == "active"
                     ]
@@ -203,8 +215,8 @@ async def debug_auth(request: Request, db: Session = Depends(get_db)):
             else:
                 debug_info["token_valid"] = False
         except Exception as e:
-            debug_info["token_error"] = str(e)
-
+            # Avoid leaking exception internals that might include secrets
+            debug_info["token_error"] = "verification_failed"
     return debug_info
 
 # =============================================================================
@@ -236,7 +248,8 @@ async def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db
         user = db.query(User).filter(User.email == email).first()
         if not user:
             # Create Stripe customer
-            stripe_customer = stripe_service.create_customer(email=email, name=email.split('@')[0])
+            require_stripe_service()
+            stripe_customer = get_stripe_service().create_customer(email=email, name=email.split('@')[0])
 
             # Generate a random internal password and store its hash so NOT NULL constraint is satisfied.
             random_pw = uuid.uuid4().hex
@@ -270,21 +283,22 @@ async def create_checkout_session(
     """Create a Stripe checkout session for subscription"""
     try:
         # Ensure user has a Stripe customer id
+        require_stripe_service()
         if not current_user.stripe_customer_id:
             try:
-                stripe_customer = stripe_service.create_customer(email=current_user.email, name=current_user.email.split('@')[0])
+                stripe_customer = get_stripe_service().create_customer(email=current_user.email, name=current_user.email.split('@')[0])
                 current_user.stripe_customer_id = stripe_customer.id
                 db.add(current_user)
                 db.commit()
             except Exception as e:
                 raise Exception(f"Failed to create Stripe customer for user: {str(e)}")
 
-        session = stripe_service.create_checkout_session(
+        session = get_stripe_service().create_checkout_session(
             customer_id=current_user.stripe_customer_id,
             plan_type=request.plan_type,
             user_id=current_user.id
         )
-        
+
         return CreateCheckoutSessionResponse(
             session_id=session.id,
             session_url=session.url
@@ -321,13 +335,16 @@ async def create_billing_portal_session(
         # If missing, try to derive from the subscription record (stripe_subscription_id)
         if not customer_id and local_sub and local_sub.stripe_subscription_id:
             try:
-                stripe_sub = stripe_service.get_subscription(local_sub.stripe_subscription_id)
-                customer_id = getattr(stripe_sub, 'customer', None) or stripe_sub.get('customer')
-                if customer_id:
-                    # persist for future use
-                    current_user.stripe_customer_id = customer_id
-                    db.add(current_user)
-                    db.commit()
+                try:
+                    stripe_sub = get_stripe_service().get_subscription(local_sub.stripe_subscription_id)
+                    customer_id = getattr(stripe_sub, 'customer', None) or stripe_sub.get('customer')
+                    if customer_id:
+                        # persist for future use
+                        current_user.stripe_customer_id = customer_id
+                        db.add(current_user)
+                        db.commit()
+                except Exception as e:
+                    print(f"⚠️ Could not derive customer from subscription {local_sub.stripe_subscription_id}: {e}")
             except Exception as e:
                 # Log and continue to allow a helpful error below
                 print(f"⚠️ Could not derive customer from subscription {local_sub.stripe_subscription_id}: {e}")
@@ -336,7 +353,8 @@ async def create_billing_portal_session(
             raise HTTPException(status_code=400, detail="Stripe customer id not found for user. Cannot open billing portal.")
 
         try:
-            session = stripe_service.create_billing_portal_session(customer_id)
+            require_stripe_service()
+            session = get_stripe_service().create_billing_portal_session(customer_id)
             return BillingPortalResponse(portal_url=session.url)
         except Exception as e:
             err_msg = str(e)
@@ -419,8 +437,8 @@ async def get_subscription_status(
 async def get_subscription_plans():
     """Get available subscription plans with pricing"""
     try:
-        monthly_price = stripe_service.get_price_info("monthly")
-        yearly_price = stripe_service.get_price_info("yearly")
+        monthly_price = get_stripe_service().get_price_info("monthly")
+        yearly_price = get_stripe_service().get_price_info("yearly")
         
         return {
             "plans": [
@@ -493,145 +511,112 @@ async def get_subscription_plans():
 
 @app.post("/api/webhook/stripe")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
-    """Handle Stripe webhooks"""
+    """Handle Stripe webhooks - always requires signature verification"""
     payload = await request.body()
     sig_header = request.headers.get('stripe-signature')
     
-    print(f"🔔 Received webhook call")
-    print(f"📝 Payload size: {len(payload)} bytes")
-    print(f"🔐 Signature header present: {bool(sig_header)}")
-    
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    print(f"🔐 Webhook secret configured: {bool(webhook_secret)}")
-    
-    try:
-        # If we have both signature and webhook secret, verify properly
-        if sig_header and webhook_secret:
-            event = stripe_service.construct_webhook_event(payload, sig_header)
-            print(f"✅ Webhook signature verified with Stripe")
-        elif webhook_secret and not sig_header:
-            # Webhook secret configured but no signature - check if this is a test
-            import json
-            event_data = json.loads(payload.decode())
-            
-            # Allow test events without signature in development
-            if event_data.get('id', '').startswith('evt_test_'):
-                print(f"🧪 Test webhook detected, skipping signature verification")
-                event = event_data
-            else:
-                print(f"⚠️ Webhook secret configured but no signature header received")
-                raise HTTPException(status_code=400, detail="Missing signature header")
-        else:
-            # Development mode: no webhook secret configured
-            import json
-            event_data = json.loads(payload.decode())
-            event = event_data
-            print(f"⚠️ DEVELOPMENT MODE: Processing webhook WITHOUT signature verification")
-            print(f"⚠️ Configure STRIPE_WEBHOOK_SECRET for production security")
-            
-        print(f"📋 Event type: {event['type']}")
-        print(f"📋 Event ID: {event.get('id', 'unknown')}")
+    logger.debug("🔔 Stripe webhook received")
 
-        # Idempotency: skip event if we've already processed this Stripe event id
+    try:
+        # Always require signature verification - no environment exceptions
+        event = get_stripe_service().construct_webhook_event(payload, sig_header)
+        logger.debug("✅ Webhook signature verification completed")
+        
+        # Idempotency handling
         try:
-            event_id = event.get('id') if isinstance(event, dict) else getattr(event, 'id', None)
-            if event_id:
-                existing = db.query(ProcessedWebhookEvent).filter(ProcessedWebhookEvent.event_id == event_id).first()
+            maybe_id = None
+            if isinstance(event, dict):
+                maybe_id = event.get("id")
+            else:
+                maybe_id = getattr(event, "id", None)
+            if maybe_id:
+                existing = db.query(ProcessedWebhookEvent).filter(ProcessedWebhookEvent.event_id == maybe_id).first()
                 if existing:
-                    print(f"↩️ Stripe event {event_id} already processed, skipping")
+                    logger.debug("↩️ Stripe event already processed, skipping")
                     return {"status": "skipped", "reason": "already processed"}
-                # Persist the event id now to avoid races
-                processed = ProcessedWebhookEvent(event_id=event_id)
+                processed = ProcessedWebhookEvent(event_id=maybe_id)
                 db.add(processed)
                 db.commit()
-                print(f"🗄️ Recorded processed webhook event {event_id}")
+                logger.debug("🗄️ Recorded processed webhook event")
         except Exception as e:
-            print(f"⚠️ Failed to persist/process idempotency for event: {e}")
+            logger.warning("⚠️ Failed to persist idempotency for webhook")
+            
     except ValueError as e:
-        print(f"❌ Webhook error: {e}")
+        logger.warning(f"❌ Webhook verification failed: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
     # Handle the event with timeout protection
     try:
-        # Use asyncio.wait_for to add a timeout to prevent hanging
         await asyncio.wait_for(process_webhook_event(event, db), timeout=30.0)
-        
     except asyncio.TimeoutError:
-        print(f"⏰ Webhook processing timed out after 30 seconds")
+        logger.warning("⏰ Webhook processing timed out after 30 seconds")
         return {"status": "timeout", "message": "Webhook processing timed out"}
-    except Exception as e:
-        print(f"❌ Error processing webhook: {e}")
-        print(f"📋 Event data: {event}")
+    except Exception:
+        logger.error("❌ Error processing webhook")
         import traceback
         traceback.print_exc()
-        # Don't raise exception to avoid webhook retries
         
     return {"status": "success"}
 
 async def process_webhook_event(event: Dict[str, Any], db: Session):
     """Process the webhook event - separated for timeout handling"""
-    if event['type'] == 'checkout.session.completed':
+    # Do not log event.type or ids; handlers can log non-sensitive status only.
+    etype = None
+    if isinstance(event, dict):
+        etype = event.get("type")
+    else:
+        etype = getattr(event, "type", None)
+    if etype == 'checkout.session.completed':
         session = event['data']['object']
-        print(f"💳 Processing checkout session: {session['id']}")
-        print(f"📋 Session metadata: {session.get('metadata', {})}")
-        print("=== Stripe Webhook Debug ===")
-        print("Session object:", session)
-        print("Session metadata:", session.get('metadata'))
+        logger.debug("💳 Processing checkout.session.completed (ids suppressed)")
         await handle_checkout_session_completed(session, db)
-        print(f"✅ Checkout session processed successfully")
+        logger.debug("✅ Checkout session processed")
     
-    elif event['type'] == 'invoice.payment_succeeded':
+    elif etype == 'invoice.payment_succeeded':
         invoice = event['data']['object']
-        print(f"💰 Processing invoice payment: {invoice['id']}")
+        logger.debug("💰 Processing invoice.payment_succeeded (ids suppressed)")
         await handle_invoice_payment_succeeded(invoice, db)
-        print(f"✅ Invoice payment processed successfully")
+        logger.debug("✅ Invoice payment processed")
     
-    elif event['type'] == 'customer.subscription.deleted':
+    elif etype == 'customer.subscription.deleted':
         subscription = event['data']['object']
-        print(f"🗑️ Processing subscription deletion: {subscription['id']}")
+        logger.debug("🗑️ Processing subscription.deleted (ids suppressed)")
         await handle_subscription_deleted(subscription, db)
-        print(f"✅ Subscription deletion processed successfully")
+        logger.debug("✅ Subscription deletion processed")
     
-    elif event['type'] == 'customer.subscription.updated':
+    elif etype == 'customer.subscription.updated':
         subscription = event['data']['object']
-        print(f"🔄 Processing subscription update: {subscription['id']}")
+        logger.debug("🔄 Processing subscription.updated (ids suppressed)")
         await handle_subscription_updated(subscription, db)
-        print(f"✅ Subscription update processed successfully")
+        logger.debug("✅ Subscription update processed")
     
     else:
-        print(f"ℹ️ Unhandled event type: {event['type']}")
+        logger.debug("ℹ️ Unhandled Stripe event type (suppressed)")
 
 async def handle_checkout_session_completed(session: Dict[str, Any], db: Session):
     """Handle successful checkout session completion"""
     try:
-        print("=== Stripe Webhook Debug ===")
-        print("Session object:", session)
-        print("Session metadata:", session.get('metadata'))
-
         metadata = session.get('metadata', {})
         user_id = metadata.get('user_id')
         plan_type = metadata.get('plan_type')
-        print(f"user_id from metadata: {user_id}, plan_type: {plan_type}")
 
         if not user_id:
-            print("❌ No user_id in session metadata! Subscription will not be created.")
+            logger.debug("❌ No user_id in session metadata")
             return
 
         user = db.query(User).filter(User.id == int(user_id)).first()
         if not user:
-            print(f"❌ No user found with id {user_id}. Subscription will not be created.")
+            logger.debug("❌ No user found for provided user_id")
             return
 
         subscription_id = session.get('subscription')
         if not subscription_id:
-            print("❌ No subscription ID in session! This is likely because the Checkout session was not created with mode='subscription'.")
+            logger.debug("❌ No subscription ID in session")
             return
 
-        print(f"📝 Creating subscription for user_id: {user_id}, plan: {plan_type}")
-        # Only log here. Actual DB update is handled in invoice.payment_succeeded.
-        print(f"ℹ️ Subscription creation event received for {subscription_id}. DB update will occur on invoice.payment_succeeded.")
+        logger.debug("📝 Checkout session processed (DB update deferred to invoice handler)")
     except Exception as e:
-        print(f"❌ Error in handle_checkout_session_completed: {e}")
+        logger.error("❌ Error in handle_checkout_session_completed")
         import traceback
         traceback.print_exc()
         db.rollback()
@@ -639,11 +624,10 @@ async def handle_checkout_session_completed(session: Dict[str, Any], db: Session
 
 async def handle_invoice_payment_succeeded(invoice: Dict[str, Any], db: Session):
     """Handle successful invoice payment"""
-    print("=== invoice.payment_succeeded handler start ===")
     # Resolve subscription_id from invoice 'subscription' or parent.subscription
     subscription_id = invoice.get("subscription") or invoice.get("parent", {}).get("subscription_details", {}).get("subscription")
     if not subscription_id:
-        print("❌ No subscription ID in invoice; skipping DB update.")
+        logger.debug("❌ No subscription ID in invoice")
         return
 
     # Always expand subscription when retrieving so metadata is available
@@ -652,12 +636,11 @@ async def handle_invoice_payment_succeeded(invoice: Dict[str, Any], db: Session)
         subscription_id,
         expand=["items", "latest_invoice", "default_payment_method"]
     )
-    print(f"Fetched subscription id={subscription_id}")
 
     # Get plan_type from subscription metadata only
     plan_type = (stripe_subscription.get('metadata') or {}).get('plan_type')
     if not plan_type:
-        print(f"❌ Subscription {subscription_id} missing 'plan_type' in metadata; skipping DB update.")
+        logger.debug("❌ Subscription missing 'plan_type' in metadata")
         return
 
     # Resolve user: prefer created_by_user_id in subscription metadata, else try customer -> user lookup
@@ -668,18 +651,18 @@ async def handle_invoice_payment_succeeded(invoice: Dict[str, Any], db: Session)
         try:
             user = db.query(User).filter(User.id == int(created_by_user_id)).first()
             if user:
-                print(f"Found user by created_by_user_id in subscription metadata: {user.id}")
+                logger.debug("Found user by created_by_user_id in subscription metadata")
         except Exception:
             user = None
 
     if not user:
         customer_id = stripe_subscription.get('customer') or invoice.get('customer')
         if not customer_id:
-            print(f"❌ No customer id available in subscription {subscription_id}; skipping DB update.")
+            logger.debug("❌ No customer id available in subscription")
             return
         user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
         if not user:
-            print(f"❌ No local user found for Stripe customer {customer_id}; skipping DB update.")
+            logger.debug("❌ No local user found for Stripe customer")
             return
 
     # Get period timestamps from subscription top-level or first item
@@ -693,18 +676,17 @@ async def handle_invoice_payment_succeeded(invoice: Dict[str, Any], db: Session)
             end_ts = first_item.get('current_period_end', end_ts)
 
     if not start_ts or not end_ts:
-        print(f"❌ Subscription {subscription_id} missing period fields; skipping DB update.")
+        logger.debug("❌ Subscription missing period fields")
         return
 
     # Check if subscription already exists
     existing_sub = db.query(Subscription).filter(Subscription.stripe_subscription_id == subscription_id).first()
     if existing_sub:
-        print(f"⚠️ Subscription already exists, updating: {subscription_id}")
+        logger.debug("⚠️ Subscription already exists, updating")
         existing_sub.status = 'active'
         existing_sub.end_date = datetime.fromtimestamp(end_ts)
-        # Don't reset questions_used - keep trial progress
         db.commit()
-        print(f"✅ Subscription updated successfully: {subscription_id}")
+        logger.debug("✅ Subscription updated successfully")
         return
 
     # Create new subscription using plan_type from metadata only
@@ -717,40 +699,28 @@ async def handle_invoice_payment_succeeded(invoice: Dict[str, Any], db: Session)
         end_date=datetime.fromtimestamp(end_ts)
     )
     db.add(db_subscription)
-    # Don't reset questions_used - keep trial progress
     db.commit()
-    print(f"✅ Subscription created successfully: {subscription_id} for user_id={user.id} (plan_type={plan_type})")
-    print("=== invoice.payment_succeeded handler end ===")
+    logger.debug("✅ Subscription created successfully")
 
 async def handle_subscription_deleted(subscription: Dict[str, Any], db: Session):
     """Handle subscription cancellation"""
     subscription_id = subscription.get('id')
-    print(f"🔔 handle_subscription_deleted called for subscription id={subscription_id}")
-    print(f"   customer: {subscription.get('customer')}")
-    print(f"   status: {subscription.get('status')}")
-    print(f"   cancel_at: {subscription.get('cancel_at')}")
-    print(f"   cancel_at_period_end: {subscription.get('cancel_at_period_end')}")
-    print(f"   current_period_end: {subscription.get('current_period_end')}")
-
-    # Update subscription status in database
-    db_subscription = db.query(Subscription).filter(
+    
+    local_sub = db.query(Subscription).filter(
         Subscription.stripe_subscription_id == subscription_id
     ).first()
-    print(f"   local subscription found: {bool(db_subscription)}")
     
-    if db_subscription:
-        db_subscription.status = "canceled"
-        # If Stripe provides a cancel_at or current_period_end timestamp, set end_date accordingly
+    if local_sub:
+        local_sub.status = "canceled"
         end_ts = subscription.get('cancel_at') or subscription.get('current_period_end')
         if end_ts:
             try:
-                db_subscription.end_date = datetime.fromtimestamp(int(end_ts))
+                local_sub.end_date = datetime.fromtimestamp(int(end_ts))
             except Exception:
                 pass
         db.commit()
-        print(f"   Updated local subscription {db_subscription.id} -> canceled, end_date={db_subscription.end_date}")
+        logger.debug("✅ Updated local subscription to canceled")
     else:
-        # No local subscription found - attempt to create a minimal subscription record
         try:
             customer = subscription.get('customer')
             plan_type = (subscription.get('metadata') or {}).get('plan_type')
@@ -772,29 +742,19 @@ async def handle_subscription_deleted(subscription: Dict[str, Any], db: Session)
                 )
                 db.add(new_sub)
                 db.commit()
-                print(f"✅ Created local canceled subscription for user {user.id} from webhook: {subscription_id}")
+                logger.debug("✅ Created local canceled subscription from webhook")
             else:
-                print(f"⚠️ Subscription deleted webhook received but no local user found for customer {customer}")
-                # Helpful hint for debugging: list recent users with null or different customer IDs
-                recent_users = db.query(User).order_by(User.id.desc()).limit(5).all()
-                print(f"   recent users (id, stripe_customer_id): {[ (u.id, u.stripe_customer_id) for u in recent_users ]}")
-        except Exception as e:
-            print(f"❌ Failed to create subscription from deleted webhook: {e}")
+                logger.debug("⚠️ Subscription deleted webhook received but no local user found")
+        except Exception:
+            logger.debug("❌ Failed to create subscription from deleted webhook")
 
 async def handle_subscription_updated(subscription: Dict[str, Any], db: Session):
     """Handle subscription updates"""
     subscription_id = subscription.get('id')
-    print(f"🔔 handle_subscription_updated called for subscription id={subscription_id}")
-    print(f"   customer: {subscription.get('customer')}")
-    print(f"   status: {subscription.get('status')}")
-    print(f"   cancel_at: {subscription.get('cancel_at')}")
-    print(f"   cancel_at_period_end: {subscription.get('cancel_at_period_end')}")
-    print(f"   current_period_end: {subscription.get('current_period_end')}")
 
     db_subscription = db.query(Subscription).filter(
         Subscription.stripe_subscription_id == subscription_id
     ).first()
-    print(f"   local subscription found: {bool(db_subscription)}")
     
     if db_subscription:
         # Update subscription details
@@ -824,7 +784,7 @@ async def handle_subscription_updated(subscription: Dict[str, Any], db: Session)
                 pass
 
         db.commit()
-        print(f"   Updated local subscription {db_subscription.id} -> status={db_subscription.status}, end_date={db_subscription.end_date}")
+        logger.debug("✅ Updated local subscription from webhook")
     else:
         # No local subscription found - attempt to map to a user and create a record
         try:
@@ -856,11 +816,11 @@ async def handle_subscription_updated(subscription: Dict[str, Any], db: Session)
                 )
                 db.add(new_sub)
                 db.commit()
-                print(f"✅ Created local subscription from updated webhook for user {user.id}: {subscription_id}")
+                logger.debug("✅ Created local subscription from updated webhook")
             else:
-                print(f"⚠️ Subscription updated webhook received but no local user found for customer {customer}")
+                logger.debug("⚠️ Subscription updated webhook received but no local user found")
         except Exception as e:
-            print(f"❌ Failed to create subscription from updated webhook: {e}")
+            logger.debug("❌ Failed to create subscription from updated webhook")
 
 # =============================================================================
 # CHAT ENDPOINTS (PROTECTED)
