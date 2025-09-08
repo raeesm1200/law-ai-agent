@@ -9,7 +9,7 @@ import sys
 import uuid
 import asyncio
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 from contextlib import asynccontextmanager
@@ -388,25 +388,30 @@ async def get_subscription_status(
     db: Session = Depends(get_db)
 ):
     """Get user's subscription status"""
-    # Choose the subscription to report:
-    # 1) Prefer an active subscription
-    # 2) Then prefer a canceled subscription that still grants access (end_date > now)
-    # 3) Otherwise, fall back to the most recently started subscription
-    now_dt = datetime.utcnow()
+    # Normalize to timezone-aware UTC
+    now_dt = datetime.now(timezone.utc)
 
+    # Prefer an active subscription
     subscription = db.query(Subscription).filter(
         Subscription.user_id == current_user.id,
         Subscription.status == 'active'
     ).order_by(Subscription.start_date.desc()).first()
 
+    # If no active, find a canceled subscription where end_date > now (evaluate in Python to avoid naive/aware DB issues)
     if not subscription:
-        subscription = db.query(Subscription).filter(
+        canceled_candidates = db.query(Subscription).filter(
             Subscription.user_id == current_user.id,
             Subscription.status == 'canceled',
-            Subscription.end_date != None,
-            Subscription.end_date > now_dt
-        ).order_by(Subscription.end_date.desc()).first()
+            Subscription.end_date != None
+        ).order_by(Subscription.end_date.desc()).all()
 
+        for sub in canceled_candidates:
+            sub_end = _to_utc_aware(sub.end_date)
+            if sub_end and sub_end > now_dt:
+                subscription = sub
+                break
+
+    # Fallback: most recent subscription by start_date
     if not subscription:
         subscription = db.query(Subscription).filter(
             Subscription.user_id == current_user.id
@@ -421,8 +426,9 @@ async def get_subscription_status(
         }
 
     # Determine whether the reported subscription currently grants access
+    sub_end_aware = _to_utc_aware(subscription.end_date)
     has_subscription = (subscription.status == 'active') or (
-        subscription.status == 'canceled' and subscription.end_date and subscription.end_date > now_dt
+        subscription.status == 'canceled' and sub_end_aware and sub_end_aware > now_dt
     )
 
     return {
@@ -695,8 +701,8 @@ async def handle_invoice_payment_succeeded(invoice: Dict[str, Any], db: Session)
         stripe_subscription_id=subscription_id,
         plan_type=plan_type,
         status='active',
-        start_date=datetime.fromtimestamp(start_ts),
-        end_date=datetime.fromtimestamp(end_ts)
+        start_date=datetime.fromtimestamp(int(start_ts), tz=timezone.utc),
+        end_date=datetime.fromtimestamp(int(end_ts), tz=timezone.utc)
     )
     db.add(db_subscription)
     db.commit()
@@ -715,7 +721,7 @@ async def handle_subscription_deleted(subscription: Dict[str, Any], db: Session)
         end_ts = subscription.get('cancel_at') or subscription.get('current_period_end')
         if end_ts:
             try:
-                local_sub.end_date = datetime.fromtimestamp(int(end_ts))
+                local_sub.end_date = datetime.fromtimestamp(int(end_ts), tz=timezone.utc)
             except Exception:
                 pass
         db.commit()
@@ -779,7 +785,7 @@ async def handle_subscription_updated(subscription: Dict[str, Any], db: Session)
 
         if end_ts:
             try:
-                db_subscription.end_date = datetime.fromtimestamp(int(end_ts))
+                db_subscription.end_date = datetime.fromtimestamp(int(end_ts), tz=timezone.utc)
             except Exception:
                 pass
 
@@ -847,7 +853,10 @@ async def chat_endpoint(
         if sub.status == "active":
             active_subscription = sub
             break
-        if sub.status == "canceled" and sub.end_date and sub.end_date > now_dt:
+        # normalize both datetimes to timezone-aware UTC before comparing
+        now_dt_aware = _to_utc_aware(now_dt)
+        sub_end_aware = _to_utc_aware(sub.end_date)
+        if sub.status == "canceled" and sub_end_aware and sub_end_aware > now_dt_aware:
             active_subscription = sub
             break
 
@@ -911,6 +920,16 @@ async def chat_endpoint(
     except Exception as e:
         print(f"❌ Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+def _to_utc_aware(dt: datetime | None) -> datetime | None:
+    """Return a timezone-aware UTC datetime for comparison.
+    If dt is naive we assume UTC (replace tzinfo). If dt is aware, convert to UTC.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 # =============================================================================
 # PUBLIC ENDPOINTS
