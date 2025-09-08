@@ -20,7 +20,8 @@ export default defineConfig({
     allowedHosts: [
       'all', // Allow all hosts for Render deployment
       'law-ai-agent-1.onrender.com',
-      'legal-rag-chatbot-frontend.onrender.com'
+      'legal-rag-chatbot-frontend.onrender.com',
+      'lawagentai.onir.world'
     ],
   },
 })
