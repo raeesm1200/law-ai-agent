@@ -304,7 +304,7 @@ export const SubscriptionPlans: React.FC = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Priority Responses</CardTitle>
+              <CardTitle className="text-lg">Priority Support 24/7</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
