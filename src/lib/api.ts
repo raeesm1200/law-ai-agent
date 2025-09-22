@@ -1,46 +1,18 @@
 import axios from 'axios';
 
-// Smart API URL detection for different environments
+// Smart API URL detection for Render deployment
 const getAPIBaseURL = () => {
-  // If environment variable is set, use it (highest priority)
+  // If environment variable is set, use it
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Check if we're in development mode
-  if (import.meta.env.DEV) {
-    console.log('🔧 Development mode detected');
-    return 'http://localhost:8000';
-  }
-  
-  // Check if we're in production mode
-  if (import.meta.env.PROD) {
-    console.log('🚀 Production build detected');
-    
-    // If running on localhost but in production build, still use local backend
-    if (typeof window !== 'undefined' && window?.location) {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        console.log('🏠 Production build running on localhost');
-        return 'http://localhost:8000';
-      }
-      
-      // For other production deployments, try to infer the API URL
-      const currentHost = window.location.hostname;
-      console.log('🌍 Production server detected, hostname:', currentHost);
-      
-      // If it's a custom domain, assume API is on the same domain
-      if (!currentHost.includes('localhost') && !currentHost.includes('127.0.0.1')) {
-        return `https://${currentHost}`;
-      }
-    }
-    
-    // Fallback for production
-    console.log('⚠️ Using production fallback URL');
+  // If we're on Render (onrender.com domain), use the Modal backend URL
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
     return 'https://cybophee2001--legal-rag-chatbot-api-api-server.modal.run';
   }
   
-  // Fallback for any other case
-  console.log('❓ Unknown environment, using localhost fallback');
+  // Development fallback
   return 'http://localhost:8000';
 };
 
@@ -108,6 +80,11 @@ export interface SubscriptionStatus {
   status: string;
   start_date?: string;
   end_date?: string;
+}
+
+// Add interface for feature flags
+export interface FeatureFlags {
+  subscription_disabled: boolean;
 }
 
 class ApiClient {
@@ -327,6 +304,17 @@ class ApiClient {
     } catch (error) {
       console.error('Save Chat History Error:', error);
       throw new Error('Failed to save chat history');
+    }
+  }
+
+  async getFeatureFlags(): Promise<FeatureFlags> {
+    try {
+      const response = await this.client.get('/api/feature-flags');
+      return response.data;
+    } catch (error) {
+      console.error('Feature Flags Error:', error);
+      // Default to subscription enabled if API fails
+      return { subscription_disabled: false };
     }
   }
 }

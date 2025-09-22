@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { useAuth } from "../contexts/AuthContext";
 
 interface Conversation {
   id: string;
@@ -48,6 +49,7 @@ interface ChatSidebarProps {
   onLogout?: () => void; // NEW - Logout function
   questionsUsed?: number;
   maxTrial?: number;
+  hasSubscription?: boolean;
   subscription?: {
     has_subscription: boolean;
     status: string;
@@ -68,13 +70,14 @@ export function ChatSidebar({
   onLanguageChange = () => {}, // NEW
   selectedLanguage = "english", // FIXED
   onLogout = () => {} // NEW - Logout function
-  , questionsUsed = 0, maxTrial = 20,
-  subscription = undefined
+  , questionsUsed = 0, maxTrial = 20, hasSubscription = false,
+  subscription = null
 }: ChatSidebarProps) {
   const [showSystemInfo, setShowSystemInfo] = useState(false);
   const [systemInfo, setSystemInfo] = useState<any>(null);
   const [selectedCountry, setSelectedCountry] = useState(propSelectedCountry);
   // const [selectedLanguage, setSelectedLanguage] = useState(propSelectedLanguage); // NEW
+  const { featureFlags } = useAuth(); // Add this line
 
   // Update local state when prop changes
   useEffect(() => {
@@ -152,37 +155,40 @@ export function ChatSidebar({
       {/* Header */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2 mb-3">
-          <img src="./onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
+          <img src="/onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <span className="text-sm text-sidebar-foreground">LAW AGENT AI</span>
         </div>
-        {/* Trial indicator / progress bar */}
-        <div className="mb-3">
-          {/* Show trial progress if no valid subscription OR if canceled subscription has expired */}
-          {(!subscriptionValid) ? (
-            <div>
-              <div className="flex items-center justify-between mb-1 text-xs text-muted-foreground/80">
-                <div><strong>Trial</strong></div>
-                <div>{questionsUsed}/{maxTrial} used</div>
+        
+        {/* Trial indicator / progress bar - Hide if subscription disabled */}
+        {!featureFlags?.subscription_disabled && (
+          <div className="mb-3">
+            {/* Show trial progress if no valid subscription OR if canceled subscription has expired */}
+            {(!subscriptionValid) ? (
+              <div>
+                <div className="flex items-center justify-between mb-1 text-xs text-muted-foreground/80">
+                  <div><strong>Trial</strong></div>
+                  <div>{questionsUsed}/{maxTrial} used</div>
+                </div>
+                <div className="w-full bg-border rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-2 bg-amber-400"
+                    style={{ width: `${Math.min(100, Math.round((questionsUsed / Math.max(1, maxTrial)) * 100))}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-border rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-2 bg-amber-400"
-                  style={{ width: `${Math.min(100, Math.round((questionsUsed / Math.max(1, maxTrial)) * 100))}%` }}
-                />
+            ) : subscription?.status === 'canceled' && subscription?.end_date ? (
+              // Show "Valid till {date}" for canceled subscriptions that haven't expired yet
+              <div className="text-xs text-yellow-400 bg-yellow-400/10 p-2 rounded">
+                <div className="font-semibold">Access until {new Date(subscription.end_date).toLocaleDateString()}</div>
+                <div></div>
               </div>
-            </div>
-          ) : subscription?.status === 'canceled' && subscription?.end_date ? (
-            // Show "Valid till {date}" for canceled subscriptions that haven't expired yet
-            <div className="text-xs text-yellow-400 bg-yellow-400/10 p-2 rounded">
-              <div className="font-semibold">Access until {new Date(subscription.end_date).toLocaleDateString()}</div>
-              <div></div>
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-2 text-xs text-green-400">
-              <span className="px-2 py-1 bg-green-800/20 rounded">Subscribed</span>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 text-xs text-green-400">
+                <span className="px-2 py-1 bg-green-800/20 rounded">Subscribed</span>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Country Selection */}
         <div className="mb-3">
@@ -303,18 +309,20 @@ export function ChatSidebar({
 
       {/* Footer */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
-        {/* Subscription Button */}
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start gap-2"
-          onClick={() => window.location.href = '/subscription'}
-        >
-          <Crown className="h-4 w-4" />
-          {subscriptionValid 
-            ? (selectedLanguage === "italian" ? "Gestisci Abbonamento" : "Manage Subscription")
-            : (selectedLanguage === "italian" ? "Abbonati" : "Subscribe")
-          }
-        </Button>
+        {/* Subscription Button - Hide if subscription disabled */}
+        {!featureFlags?.subscription_disabled && (
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-2"
+            onClick={() => window.location.href = '/subscription'}
+          >
+            <Crown className="h-4 w-4" />
+            {subscriptionValid 
+              ? (selectedLanguage === "italian" ? "Gestisci Abbonamento" : "Manage Subscription")
+              : (selectedLanguage === "italian" ? "Abbonati" : "Subscribe")
+            }
+          </Button>
+        )}
 
         <Button 
           variant="ghost" 

@@ -53,6 +53,8 @@ from google.auth.transport import requests as google_requests
 chatbot: Optional[LegalRAGChatbot] = None
 chat_histories: Dict[str, list] = {}  # conversation_id -> chat history
 
+DISABLE_SUBSCRIPTION = os.getenv("DISABLE_SUBSCRIPTION", "false").lower() == "true"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup the chatbot and database"""
@@ -95,7 +97,8 @@ app.add_middleware(
         "https://*.vercel.app",
         "https://*.netlify.app",
         "https://onir.world/lawagentai",
-        "https://onir.world"
+        "https://onir.world",
+        "https://lawagentai.onir.world"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -388,6 +391,15 @@ async def get_subscription_status(
     db: Session = Depends(get_db)
 ):
     """Get user's subscription status"""
+    # If subscriptions are disabled, return unlimited access
+    if DISABLE_SUBSCRIPTION:
+        return {
+            "has_subscription": True,
+            "plan_type": "unlimited",
+            "status": "active",
+            "subscription_disabled": True
+        }
+    
     # Normalize to timezone-aware UTC
     now_dt = datetime.now(timezone.utc)
 
@@ -844,28 +856,30 @@ async def chat_endpoint(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # Get user's active subscription (if any)
-    active_subscription = None
-    now_dt = datetime.utcnow()
-    for sub in current_user.subscriptions:
-        # Treat subscription as active if status is 'active'
-        # or if it was canceled but has an end_date in the future (scheduled cancellation)
-        if sub.status == "active":
-            active_subscription = sub
-            break
-        # normalize both datetimes to timezone-aware UTC before comparing
-        now_dt_aware = _to_utc_aware(now_dt)
-        sub_end_aware = _to_utc_aware(sub.end_date)
-        if sub.status == "canceled" and sub_end_aware and sub_end_aware > now_dt_aware:
-            active_subscription = sub
-            break
+    # Skip subscription checks if feature flag is disabled
+    if not DISABLE_SUBSCRIPTION:
+        # Get user's active subscription (if any)
+        active_subscription = None
+        now_dt = datetime.utcnow()
+        for sub in current_user.subscriptions:
+            # Treat subscription as active if status is 'active'
+            # or if it was canceled but has an end_date in the future (scheduled cancellation)
+            if sub.status == "active":
+                active_subscription = sub
+                break
+            # normalize both datetimes to timezone-aware UTC before comparing
+            now_dt_aware = _to_utc_aware(now_dt)
+            sub_end_aware = _to_utc_aware(sub.end_date)
+            if sub.status == "canceled" and sub_end_aware and sub_end_aware > now_dt_aware:
+                active_subscription = sub
+                break
 
-    # Check if user has any subscription access (active or canceled with future end_date)
-    has_subscription_access = active_subscription is not None
+        # Check if user has any subscription access (active or canceled with future end_date)
+        has_subscription_access = active_subscription is not None
 
-    # Enforce trial limit: 20 questions if not subscribed AND no valid canceled subscription
-    if (current_user.questions_used is not None and current_user.questions_used >= 20) and not has_subscription_access:
-        raise HTTPException(status_code=403, detail={"error": "Trial limit reached. Please subscribe to continue."})
+        # Enforce trial limit: 20 questions if not subscribed AND no valid canceled subscription
+        if (current_user.questions_used is not None and current_user.questions_used >= 20) and not has_subscription_access:
+            raise HTTPException(status_code=403, detail={"error": "Trial limit reached. Please subscribe to continue."})
 
     try:
         language = (request.language or "english").lower()
@@ -906,8 +920,8 @@ async def chat_endpoint(
         )
         db.add(chat_record)
 
-        # Increment questions_used if user doesn't have subscription access
-        if not has_subscription_access:
+        # Increment questions_used only if subscription feature is enabled and user doesn't have access
+        if not DISABLE_SUBSCRIPTION and not has_subscription_access:
             current_user.questions_used = (current_user.questions_used or 0) + 1
             db.add(current_user)
 
@@ -921,15 +935,13 @@ async def chat_endpoint(
         print(f"❌ Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-def _to_utc_aware(dt: datetime | None) -> datetime | None:
-    """Return a timezone-aware UTC datetime for comparison.
-    If dt is naive we assume UTC (replace tzinfo). If dt is aware, convert to UTC.
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+# Add new endpoint to get feature flags
+@app.get("/api/feature-flags")
+async def get_feature_flags():
+    """Get feature flags"""
+    return {
+        "subscription_disabled": DISABLE_SUBSCRIPTION
+    }
 
 # =============================================================================
 # PUBLIC ENDPOINTS
