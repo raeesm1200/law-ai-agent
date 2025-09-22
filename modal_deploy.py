@@ -56,7 +56,6 @@ image = (
         "TOKENIZERS_PARALLELISM": "false",
         "TRANSFORMERS_CACHE": "/tmp/transformers_cache",
         "HF_HOME": "/tmp/huggingface_cache",
-        "DISABLE_SUBSCRIPTION": os.getenv("DISABLE_SUBSCRIPTION", "false")  # Add this line
     })
     # Add essential Python files directly to the image
     .add_local_file("api_server.py", "/project/api_server.py")
@@ -82,7 +81,8 @@ app = modal.App("legal-rag-chatbot-api", image=image)
         modal.Secret.from_name("stripe-config"),
         modal.Secret.from_name("jwt-config"),
         modal.Secret.from_name("google-oauth"),
-        modal.Secret.from_name("database-config")
+        modal.Secret.from_name("database-config"),
+        modal.Secret.from_name("disable-subscription")  # Add this line
     ],
     timeout=1800,
     cpu=2.0,
@@ -106,7 +106,8 @@ def api_server():
         modal.Secret.from_name("stripe-config"),
         modal.Secret.from_name("jwt-config"),
         modal.Secret.from_name("google-oauth"),
-        modal.Secret.from_name("database-config")
+        modal.Secret.from_name("database-config"),
+        modal.Secret.from_name("disable-subscription")  # Add this line
     ],
     timeout=300,
 )
