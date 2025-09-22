@@ -5,6 +5,7 @@ Uses existing api_server.py and legal_rag_chatbot.py files directly
 """
 
 import modal
+import os  # Import os to access environment variables
 
 # Define the Modal image with exact versions
 image = (
@@ -54,7 +55,8 @@ image = (
     .env({
         "TOKENIZERS_PARALLELISM": "false",
         "TRANSFORMERS_CACHE": "/tmp/transformers_cache",
-        "HF_HOME": "/tmp/huggingface_cache"
+        "HF_HOME": "/tmp/huggingface_cache",
+        "DISABLE_SUBSCRIPTION": os.getenv("DISABLE_SUBSCRIPTION", "false")  # Add this line
     })
     # Add essential Python files directly to the image
     .add_local_file("api_server.py", "/project/api_server.py")

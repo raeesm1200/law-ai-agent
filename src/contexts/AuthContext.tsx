@@ -17,6 +17,10 @@ interface Subscription {
   end_date?: string;
 }
 
+interface FeatureFlags {
+  subscription_disabled: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   subscription: Subscription | null;
@@ -26,6 +30,7 @@ interface AuthContextType {
   logout: () => void;
   refreshSubscription: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  featureFlags: FeatureFlags | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,9 +51,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags | null>(null);
 
   useEffect(() => {
     checkAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    const loadFeatureFlags = async () => {
+      try {
+        const flags = await apiClient.getFeatureFlags();
+        setFeatureFlags(flags);
+      } catch (error) {
+        console.error('Failed to load feature flags:', error);
+        setFeatureFlags({ subscription_disabled: false });
+      }
+    };
+    loadFeatureFlags();
   }, []);
 
   const checkAuthStatus = async () => {
@@ -168,6 +187,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     refreshSubscription,
   refreshUser,
+  featureFlags,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

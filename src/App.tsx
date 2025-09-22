@@ -5,6 +5,7 @@ import { ChatArea } from "./components/ChatArea";
 import { AuthForm } from "./components/AuthForm";
 import { SubscriptionPlans } from "./components/SubscriptionPlans";
 import { SubscriptionSuccess, SubscriptionCancel } from "./components/SubscriptionStatus";
+import { TestSuccess } from "./components/TestSuccess";
 import { Router } from "./components/Router";
 import { apiClient } from "./lib/api";
 import { Alert, AlertDescription } from "./components/ui/alert";
@@ -33,7 +34,7 @@ function getLanguageFromUrl() {
 
 // Main Chat Component (Protected)
 const ChatApp: React.FC = () => {
-  const { user, subscription, logout, refreshUser } = useAuth();
+  const { user, subscription, logout, refreshUser, featureFlags } = useAuth(); // Add featureFlags
   const [selectedLanguage, setSelectedLanguage] = useState(getLanguageFromUrl());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -78,19 +79,22 @@ const ChatApp: React.FC = () => {
   };
 
   const handleSendMessage = async (message: string) => {
-    // Client-side trial enforcement: allow up to 20 free messages if user has no active subscription access
-    const questionsUsed = user?.questions_used || 0;
-    
-    // Check if user has subscription access (active subscription or canceled but still valid)
-    const hasSubscriptionAccess = subscription?.has_subscription || 
-                                 (subscription?.status === 'canceled' && 
-                                  subscription?.end_date && 
-                                  new Date(subscription.end_date) > new Date());
+    // Skip trial enforcement if subscriptions are disabled
+    if (!featureFlags?.subscription_disabled) {
+      // Client-side trial enforcement: allow up to 20 free messages if user has no active subscription access
+      const questionsUsed = user?.questions_used || 0;
+      
+      // Check if user has subscription access (active subscription or canceled but still valid)
+      const hasSubscriptionAccess = subscription?.has_subscription || 
+                                   (subscription?.status === 'canceled' && 
+                                    subscription?.end_date && 
+                                    new Date(subscription.end_date) > new Date());
 
-    if (!hasSubscriptionAccess && questionsUsed >= 20) {
-      // Redirect to subscription page
-      window.location.href = '/subscription';
-      return;
+      if (!hasSubscriptionAccess && questionsUsed >= 20) {
+        // Redirect to subscription page
+        window.location.href = '/subscription';
+        return;
+      }
     }
 
     setSubscriptionError("");
@@ -268,7 +272,7 @@ const ChatApp: React.FC = () => {
   return (
     <div className="flex h-screen bg-background">
       {/* Mobile Header */}
-  <div className="lg:hidden fixed top-0 left-0 right-0 z-50 mobile-header p-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 mobile-header p-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -279,7 +283,7 @@ const ChatApp: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <img src="./onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
+          <img src="/onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <h1 className="text-lg font-semibold text-white truncate">LAW AGENT AI</h1>
           <span className="ml-2 px-2 py-1 rounded bg-primary/80 text-white text-xs whitespace-nowrap">
             {selectedLanguage === "italian" ? "🇮🇹 Italian" : "🇺🇸 English"}
@@ -287,7 +291,8 @@ const ChatApp: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            {!subscription?.has_subscription && (
+            {/* Hide upgrade button if subscription disabled */}
+            {!featureFlags?.subscription_disabled && !subscription?.has_subscription && (
               <Button 
                 size="sm"
                 onClick={() => window.location.href = '/subscription'}
@@ -336,6 +341,7 @@ const ChatApp: React.FC = () => {
           onLogout={logout}
           questionsUsed={user?.questions_used || 0}
           maxTrial={20}
+          hasSubscription={!!subscription?.has_subscription || !!(subscription?.status === 'canceled' && subscription?.end_date && new Date(subscription.end_date) > new Date())}
           subscription={subscription ?? undefined}
         />
       </div>
@@ -369,6 +375,7 @@ const ChatApp: React.FC = () => {
               onLogout={logout}
               questionsUsed={user?.questions_used || 0}
               maxTrial={20}
+              hasSubscription={!!subscription?.has_subscription || !!(subscription?.status === 'canceled' && subscription?.end_date && new Date(subscription.end_date) > new Date())}
               subscription={subscription ?? undefined}
             />
           </div>
@@ -414,7 +421,7 @@ const LoginPage: React.FC = () => {
 
 // Protected Route Component that checks subscription
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requireSubscription?: boolean }> = ({ children, requireSubscription = false }) => {
-  const { user, subscription, isLoading } = useAuth();
+  const { user, subscription, isLoading, featureFlags } = useAuth(); // Add featureFlags
 
   if (isLoading) {
     return (
@@ -438,7 +445,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requireSubscription?
 
   // If subscription is required and user doesn't have one, redirect to subscription page
   // BUT don't redirect if they just came from payment verification (give them a moment)
-  if (requireSubscription && !subscription?.has_subscription && !isVerified) {
+  if (requireSubscription && !featureFlags?.subscription_disabled && !subscription?.has_subscription && !isVerified) {
     window.location.href = '/subscription';
     return null;
   }
