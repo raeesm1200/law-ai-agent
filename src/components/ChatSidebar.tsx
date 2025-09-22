@@ -40,53 +40,44 @@ interface ChatSidebarProps {
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
-  isMobile?: boolean;
-  onClose?: () => void;
-  onCountryChange?: (country: string) => void;
-  selectedCountry?: string;
-  onLanguageChange?: (language: string) => void; // NEW
-  selectedLanguage?: string; // NEW
-  onLogout?: () => void; // NEW - Logout function
-  questionsUsed?: number;
-  maxTrial?: number;
-  hasSubscription?: boolean;
-  subscription?: {
-    has_subscription: boolean;
-    status: string;
-    end_date?: string;
-  };
+  isMobile: boolean;
+  onClose: () => void;
+  onCountryChange: (country: string) => void;
+  selectedCountry: string;
+  onLanguageChange: (language: string) => void;
+  selectedLanguage: string;
+  onLogout: () => void;
+  questionsUsed: number;
+  maxTrial: number;
+  subscription: { has_subscription: boolean; status: string; end_date?: string } | null;
 }
 
 export function ChatSidebar({ 
-  conversations, 
-  activeConversationId, 
-  onSelectConversation, 
+  conversations,
+  activeConversationId,
+  onSelectConversation,
   onNewConversation,
   onDeleteConversation,
-  isMobile = false,
-  onClose = () => {},
-  onCountryChange = () => {},
-  selectedCountry: propSelectedCountry = "italy",
-  onLanguageChange = () => {}, // NEW
-  selectedLanguage = "english", // FIXED
-  onLogout = () => {} // NEW - Logout function
-  , questionsUsed = 0, maxTrial = 20, hasSubscription = false,
-  subscription = null
+  isMobile,
+  onClose,
+  onCountryChange,
+  selectedCountry,
+  onLanguageChange,
+  selectedLanguage,
+  onLogout,
+  questionsUsed,
+  maxTrial,
+  subscription
 }: ChatSidebarProps) {
   const [showSystemInfo, setShowSystemInfo] = useState(false);
   const [systemInfo, setSystemInfo] = useState<any>(null);
-  const [selectedCountry, setSelectedCountry] = useState(propSelectedCountry);
-  // const [selectedLanguage, setSelectedLanguage] = useState(propSelectedLanguage); // NEW
-  const { featureFlags } = useAuth(); // Add this line
+  const [selectedCountryState, setSelectedCountry] = useState(selectedCountry);
+  const { featureFlags } = useAuth();
 
   // Update local state when prop changes
   useEffect(() => {
-    setSelectedCountry(propSelectedCountry);
-  }, [propSelectedCountry]);
-
-  // useEffect(() => {
-  //   setSelectedLanguage(propSelectedLanguage);
-  // }, [propSelectedLanguage]);
+    setSelectedCountry(selectedCountry);
+  }, [selectedCountry]);
 
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
@@ -94,7 +85,6 @@ export function ChatSidebar({
   };
 
   const handleLanguageChange = (language: string) => {
-    // setSelectedLanguage(language);
     onLanguageChange(language);
   };
 
@@ -128,11 +118,11 @@ export function ChatSidebar({
     fetchSystemInfo();
   }, []);
 
-  // Derived subscription access: consider subscription "valid" when has_subscription is true
-  // and either there is no end_date (recurring) or the end_date is in the future.
-  const now = new Date();
-  const subscriptionEndDate = subscription?.end_date ? new Date(subscription.end_date) : null;
-  const subscriptionValid = !!(subscription && subscription.has_subscription && (!subscriptionEndDate || subscriptionEndDate > now));
+  // Calculate subscription validity
+  const subscriptionValid = !!subscription?.has_subscription || 
+    !!(subscription?.status === 'canceled' && 
+       subscription?.end_date && 
+       new Date(subscription.end_date) > new Date());
 
   return (
     <div className={`${isMobile ? 'w-full max-w-xs mobile-sidebar' : 'w-80'} h-full ${isMobile ? 'backdrop-blur-md' : 'bg-sidebar'} border-r border-sidebar-border flex flex-col min-h-0 ${isMobile ? 'shadow-2xl' : ''}`}>
@@ -192,12 +182,12 @@ export function ChatSidebar({
         
         {/* Country Selection */}
         <div className="mb-3">
-          <Select value={selectedCountry} onValueChange={handleCountryChange}>
+          <Select value={selectedCountryState} onValueChange={handleCountryChange}>
             <SelectTrigger className="w-full">
               <SelectValue>
                 <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  {countries.find(c => c.value === selectedCountry)?.label || "Select Country"}
+                  {countries.find(c => c.value === selectedCountryState)?.label || "Select Country"}
                 </div>
               </SelectValue>
             </SelectTrigger>
