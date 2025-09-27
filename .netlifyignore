@@ -1,0 +1,10 @@
+# Ignore Python backend files during frontend build
+*.py
+requirements.txt
+Dockerfile
+heroku.yml
+__pycache__/
+*.pyc
+.env
+alembic/
+alembic.ini
