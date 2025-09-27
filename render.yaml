@@ -25,4 +25,4 @@ services:
     rootDir: ./
     envVars:
       - key: VITE_API_URL
-        value: https://cybophee2001--legal-rag-chatbot-api-api-server.modal.run
+        value: https://law-agent-ai-prod-91772216e445.herokuapp.com
