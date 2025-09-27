@@ -5,11 +5,17 @@
   # Directory to publish (build output)
   publish = "dist"
   
+  # Force base directory to current directory
+  base = "."
+  
 [build.environment]
   # Node.js version - force Node.js build
   NODE_VERSION = "18"
-  # Explicitly disable Python 
+  # Force Node environment
+  NODE_ENV = "production"
+  # Explicitly disable Python detection
   DISABLE_PYTHON = "true"
+  NPM_CONFIG_PRODUCTION = "false"
   # Production API URL - update this to your Heroku backend
   VITE_API_URL = "https://law-agent-ai-prod-91772216e445.herokuapp.com"
 

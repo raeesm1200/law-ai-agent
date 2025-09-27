@@ -1,6 +1,8 @@
 # Ignore Python backend files during frontend build
 *.py
 requirements.txt
+runtime.txt
+.python-version
 Dockerfile
 heroku.yml
 __pycache__/
