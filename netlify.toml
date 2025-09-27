@@ -4,11 +4,10 @@
   
   # Directory to publish (build output)
   publish = "dist"
-  
-  # Node.js version
-  environment = { NODE_VERSION = "18" }
 
 [build.environment]
+  # Node.js version
+  NODE_VERSION = "18"
   # Production API URL - update this to your Heroku backend
   VITE_API_URL = "https://law-agent-ai-prod-91772216e445.herokuapp.com"
 
