@@ -24,8 +24,6 @@ from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
 from langchain_groq import ChatGroq
 from langchain_community.vectorstores import Qdrant
-from langchain_community.embeddings import SentenceTransformerEmbeddings
-
 # Qdrant imports
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
@@ -35,6 +33,30 @@ colorama.init(autoreset=True)
 
 # Load environment variables
 load_dotenv()
+
+
+class CustomEmbeddings:
+    """Custom embeddings wrapper that uses a single SentenceTransformer model."""
+    
+    def __init__(self, sentence_transformer):
+        self.sentence_transformer = sentence_transformer
+    
+    def embed_documents(self, texts):
+        """Embed a list of documents."""
+        return self.sentence_transformer.encode(
+            texts, 
+            normalize_embeddings=True,
+            convert_to_numpy=True
+        ).tolist()
+    
+    def embed_query(self, text):
+        """Embed a single query."""
+        return self.sentence_transformer.encode(
+            [text], 
+            normalize_embeddings=True,
+            convert_to_numpy=True
+        )[0].tolist()
+
 
 class LegalRAGChatbot:
     """
@@ -92,22 +114,19 @@ class LegalRAGChatbot:
             raise
             
     def setup_embeddings(self):
-        """Initialize the embedding model."""
+        """Initialize the embedding model - MEMORY OPTIMIZED: Load only ONE model."""
         try:
-            self.embeddings = SentenceTransformerEmbeddings(
-                model_name=self.embedding_model_name,
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={
-                    'normalize_embeddings': True,
-                    'convert_to_numpy': True
-                }
+            # Load only ONE sentence transformer model
+            from sentence_transformers import SentenceTransformer
+            self.sentence_transformer = SentenceTransformer(
+                self.embedding_model_name,
+                device='cpu'
             )
             
-            # Also initialize the direct sentence transformer for query embedding
-            from sentence_transformers import SentenceTransformer
-            self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
+            # Create a custom embeddings wrapper that uses our single model
+            self.embeddings = CustomEmbeddings(self.sentence_transformer)
             
-            print(f"{Fore.GREEN}✅ Embeddings initialized: {self.embedding_model_name}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Embeddings initialized (memory optimized): {self.embedding_model_name}{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}❌ Failed to initialize embeddings: {e}{Style.RESET_ALL}")
             raise
@@ -395,9 +414,9 @@ Legal Assistant Response:"""
         try:
             print(f"{Fore.CYAN}🔎 Using collection for retrieval: {self.qdrant_collection}{Style.RESET_ALL}")  # <-- Add this line
 
-            # Use direct sentence transformer to create query embedding
+            # Use our custom embeddings wrapper for consistency
             formatted_query = f"query: {query.strip()}"
-            query_embedding = self.sentence_transformer.encode(formatted_query, convert_to_numpy=True).tolist()
+            query_embedding = self.embeddings.embed_query(formatted_query)
             
             
             
