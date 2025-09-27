@@ -64,11 +64,8 @@ class GradioSpaceEmbeddings:
             
             for text in texts:
                 try:
-                    # Format text for E5 model (as per documentation)
-                    formatted_text = f"query: {text.strip()}"
-                    
-                    # Call the Gradio Space with formatted text
-                    result = self.client.predict(formatted_text)
+                    # Call Gradio Space (server handles "query:" formatting)
+                    result = self.client.predict(text.strip())
                     
                     # The result should be a list of floats (embedding vector)
                     if isinstance(result, list) and len(result) > 0:
@@ -454,8 +451,8 @@ Legal Assistant Response:"""
             print(f"{Fore.CYAN}🔎 Using collection for retrieval: {self.qdrant_collection}{Style.RESET_ALL}")  # <-- Add this line
 
             # Use our custom embeddings wrapper for consistency
-            formatted_query = f"query: {query.strip()}"
-            query_embedding = self.embeddings.embed_query(formatted_query)
+            # No need to add "query:" prefix - Gradio Space handles it
+            query_embedding = self.embeddings.embed_query(query.strip())
             
             
             
