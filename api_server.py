@@ -98,7 +98,8 @@ app.add_middleware(
         "https://*.netlify.app",
         "https://onir.world/lawagentai",
         "https://onir.world",
-        "https://lawagentai.onir.world"
+        "https://lawagentai.onir.world",
+        "https://voluble-caramel-c5e892.netlify.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],

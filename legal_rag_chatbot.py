@@ -35,72 +35,64 @@ colorama.init(autoreset=True)
 load_dotenv()
 
 
-class HuggingFaceAPIEmbeddings:
-    """Zero-memory embeddings using HuggingFace InferenceClient - same model as stored embeddings."""
+class GradioSpaceEmbeddings:
+    """Zero-memory embeddings using Gradio Space API."""
     
-    def __init__(self, model_name="intfloat/multilingual-e5-base"):
-        self.model_name = model_name
+    def __init__(self, space_name="raeesm1200/law-ai-agent"):
+        self.space_name = space_name
         
-        # Get HF token from environment variables
-        hf_token = os.getenv("HF_TOKEN")
-        if not hf_token:
-            raise ValueError("HF_TOKEN not found in environment variables")
+        # Initialize Gradio client
+        from gradio_client import Client
+        self.client = Client(space_name)
         
-        # Initialize HuggingFace InferenceClient
-        from huggingface_hub import InferenceClient
-        self.client = InferenceClient(
-            provider="hf-inference",
-            api_key=hf_token,
-        )
-        
-        print(f"✅ HuggingFace InferenceClient configured: {self.model_name}")
-        print("🧠 ZERO MEMORY USAGE - Using HF InferenceClient!")
+        print(f"✅ Gradio client configured: {self.space_name}")
+        print("🧠 ZERO MEMORY USAGE - Using Gradio Space API!")
     
     def embed_documents(self, texts):
-        """Embed documents using HuggingFace InferenceClient - no local model loading."""
-        return self._hf_embed_batch(texts)
+        """Embed documents using Gradio Space API."""
+        return self._gradio_embed_batch(texts)
     
     def embed_query(self, text):
-        """Embed a single query using HuggingFace InferenceClient - no local model loading."""
-        embeddings = self._hf_embed_batch([text])
+        """Embed a single query using Gradio Space API."""
+        embeddings = self._gradio_embed_batch([text])
         return embeddings[0] if embeddings else []
     
-    def _hf_embed_batch(self, texts):
-        """Use HuggingFace InferenceClient for batch embeddings."""
+    def _gradio_embed_batch(self, texts):
+        """Use Gradio Space for batch embeddings."""
         try:
-            # Format texts for E5 model (same as your original embeddings)
-            formatted_texts = [f"query: {text.strip()}" for text in texts]
-            
-            # Use feature extraction to get embeddings
             embeddings = []
             
-            for text in formatted_texts:
+            for text in texts:
                 try:
-                    # Use the client to get embeddings via feature extraction
-                    result = self.client.feature_extraction(
-                        text,
-                        model=self.model_name
-                    )
+                    # Format text for E5 model (as per documentation)
+                    formatted_text = f"query: {text.strip()}"
                     
-                    # Normalize embeddings (same as your original process)
-                    import numpy as np
-                    embedding_array = np.array(result)
-                    # Handle case where result might be nested
-                    if embedding_array.ndim > 1:
-                        embedding_array = embedding_array.flatten()
+                    # Call the Gradio Space with formatted text
+                    result = self.client.predict(formatted_text)
                     
-                    normalized = embedding_array / np.linalg.norm(embedding_array)
-                    embeddings.append(normalized.tolist())
+                    # The result should be a list of floats (embedding vector)
+                    if isinstance(result, list) and len(result) > 0:
+                        # Check if it's a proper embedding vector
+                        if isinstance(result[0], (int, float)):
+                            # Direct embedding vector
+                            embeddings.append(result)
+                        else:
+                            print(f"⚠️ Unexpected result format: {type(result[0])}")
+                            embeddings.append(result)
+                    else:
+                        print(f"⚠️ Unexpected result type: {type(result)}")
+                        embeddings.append(result)
                     
                 except Exception as e:
                     print(f"❌ Error embedding text '{text[:50]}...': {e}")
+                    print(f"❌ Gradio Space error: {e}")
                     raise
             
-            print(f"✅ Generated {len(embeddings)} embeddings via HF InferenceClient")
+            print(f"✅ Generated {len(embeddings)} embeddings via Gradio Space")
             return embeddings
             
         except Exception as e:
-            print(f"❌ HuggingFace InferenceClient error: {e}")
+            print(f"❌ Gradio Space embedding error: {e}")
             raise
     
     def cleanup_memory(self):
@@ -170,11 +162,10 @@ class LegalRAGChatbot:
         """Initialize HuggingFace API embeddings - ZERO MEMORY USAGE."""
         try:
             # Use HF API with EXACT SAME model as your stored embeddings
-            self.embeddings = HuggingFaceAPIEmbeddings(
-                model_name=self.embedding_model_name  
+            self.embeddings = GradioSpaceEmbeddings(
+                space_name="raeesm1200/law-ai-agent"
             )
-            
-            print(f"{Fore.GREEN}✅ HF API embeddings ready: {self.embedding_model_name}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Gradio Space embeddings ready{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}❌ Failed to setup embeddings: {e}{Style.RESET_ALL}")
             raise

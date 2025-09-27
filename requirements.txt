@@ -27,7 +27,7 @@ langchain_groq==0.3.7
 # Removed sentence-transformers and torch - using HuggingFace API instead
 qdrant-client==1.15.1
 colorama>=0.4.6
-# HuggingFace Inference Client for embeddings
-huggingface_hub>=0.19.0
-# NumPy for embedding normalization
+# Gradio client for embeddings via Space API
+gradio_client>=1.13.3
+# NumPy for embedding normalization  
 numpy>=1.21.0
