@@ -8,8 +8,8 @@
 [build.environment]
   # Node.js version
   NODE_VERSION = "18"
-  # Production environment
-  NODE_ENV = "production"
+  # Ensure dev dependencies are installed for TypeScript
+  NPM_CONFIG_PRODUCTION = "false"
   # Production API URL - points to Heroku backend
   VITE_API_URL = "https://law-agent-ai-prod-91772216e445.herokuapp.com"
 
