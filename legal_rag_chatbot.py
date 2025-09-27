@@ -35,61 +35,77 @@ colorama.init(autoreset=True)
 load_dotenv()
 
 
-class DiskCachedEmbeddings:
-    """Memory-efficient embeddings that load model on-demand and cache to disk."""
+class HuggingFaceAPIEmbeddings:
+    """Zero-memory embeddings using HuggingFace InferenceClient - same model as stored embeddings."""
     
-    def __init__(self, model_name, cache_dir="/tmp/sentence_transformers"):
+    def __init__(self, model_name="intfloat/multilingual-e5-base"):
         self.model_name = model_name
-        self.cache_dir = cache_dir
-        self._model = None
         
-        # Set environment variables for disk caching
-        import os
-        os.environ['SENTENCE_TRANSFORMERS_HOME'] = cache_dir
-        os.environ['TRANSFORMERS_CACHE'] = cache_dir
+        # Get HF token from environment variables
+        hf_token = os.getenv("HF_TOKEN")
+        if not hf_token:
+            raise ValueError("HF_TOKEN not found in environment variables")
         
-        # Ensure cache directory exists
-        os.makedirs(cache_dir, exist_ok=True)
-    
-    def _get_model(self):
-        """Lazy load the model only when needed."""
-        if self._model is None:
-            print(f"🔄 Loading embedding model to disk cache: {self.model_name}")
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(
-                self.model_name,
-                device='cpu',
-                cache_folder=self.cache_dir
-            )
-            print("✅ Model loaded and cached to disk")
-        return self._model
+        # Initialize HuggingFace InferenceClient
+        from huggingface_hub import InferenceClient
+        self.client = InferenceClient(
+            provider="hf-inference",
+            api_key=hf_token,
+        )
+        
+        print(f"✅ HuggingFace InferenceClient configured: {self.model_name}")
+        print("🧠 ZERO MEMORY USAGE - Using HF InferenceClient!")
     
     def embed_documents(self, texts):
-        """Embed a list of documents."""
-        model = self._get_model()
-        return model.encode(
-            texts, 
-            normalize_embeddings=True,
-            convert_to_numpy=True
-        ).tolist()
+        """Embed documents using HuggingFace InferenceClient - no local model loading."""
+        return self._hf_embed_batch(texts)
     
     def embed_query(self, text):
-        """Embed a single query."""
-        model = self._get_model()
-        return model.encode(
-            [text], 
-            normalize_embeddings=True,
-            convert_to_numpy=True
-        )[0].tolist()
+        """Embed a single query using HuggingFace InferenceClient - no local model loading."""
+        embeddings = self._hf_embed_batch([text])
+        return embeddings[0] if embeddings else []
+    
+    def _hf_embed_batch(self, texts):
+        """Use HuggingFace InferenceClient for batch embeddings."""
+        try:
+            # Format texts for E5 model (same as your original embeddings)
+            formatted_texts = [f"query: {text.strip()}" for text in texts]
+            
+            # Use feature extraction to get embeddings
+            embeddings = []
+            
+            for text in formatted_texts:
+                try:
+                    # Use the client to get embeddings via feature extraction
+                    result = self.client.feature_extraction(
+                        text,
+                        model=self.model_name
+                    )
+                    
+                    # Normalize embeddings (same as your original process)
+                    import numpy as np
+                    embedding_array = np.array(result)
+                    # Handle case where result might be nested
+                    if embedding_array.ndim > 1:
+                        embedding_array = embedding_array.flatten()
+                    
+                    normalized = embedding_array / np.linalg.norm(embedding_array)
+                    embeddings.append(normalized.tolist())
+                    
+                except Exception as e:
+                    print(f"❌ Error embedding text '{text[:50]}...': {e}")
+                    raise
+            
+            print(f"✅ Generated {len(embeddings)} embeddings via HF InferenceClient")
+            return embeddings
+            
+        except Exception as e:
+            print(f"❌ HuggingFace InferenceClient error: {e}")
+            raise
     
     def cleanup_memory(self):
-        """Free the model from memory (will be reloaded when needed)."""
-        if self._model is not None:
-            del self._model
-            self._model = None
-            import gc
-            gc.collect()
-            print("🧹 Embedding model freed from memory")
+        """No cleanup needed - no models in memory."""
+        print("✅ No memory cleanup needed - InferenceClient uses zero local memory")
 
 
 class LegalRAGChatbot:
@@ -151,15 +167,14 @@ class LegalRAGChatbot:
             raise
             
     def setup_embeddings(self):
-        """Initialize disk-cached embeddings - MEMORY OPTIMIZED: Lazy loading."""
+        """Initialize HuggingFace API embeddings - ZERO MEMORY USAGE."""
         try:
-            # Create disk-cached embeddings (loads model only when needed)
-            self.embeddings = DiskCachedEmbeddings(
-                model_name=self.embedding_model_name,
-                cache_dir=self.model_cache_dir
+            # Use HF API with EXACT SAME model as your stored embeddings
+            self.embeddings = HuggingFaceAPIEmbeddings(
+                model_name=self.embedding_model_name  
             )
             
-            print(f"{Fore.GREEN}✅ Disk-cached embeddings ready: {self.embedding_model_name}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ HF API embeddings ready: {self.embedding_model_name}{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}❌ Failed to setup embeddings: {e}{Style.RESET_ALL}")
             raise
