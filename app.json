@@ -1,0 +1,69 @@
+{
+  "name": "Law Agent AI",
+  "description": "Italian Legal Assistant using RAG with FastAPI backend",
+  "image": "heroku/python",
+  "repository": "https://github.com/raeesm1200/law-ai-agent",
+  "keywords": ["python", "fastapi", "ai", "legal", "rag", "stripe"],
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "env": {
+    "ENVIRONMENT": "production",
+    "SECRET_KEY": {
+      "description": "Secret key for JWT tokens",
+      "generator": "secret"
+    },
+    "GROQ_API_KEY": {
+      "description": "Groq API key for AI models"
+    },
+    "QDRANT_URL": {
+      "description": "Qdrant vector database URL"
+    },
+    "QDRANT_API_KEY": {
+      "description": "Qdrant API key"
+    },
+    "QDRANT_COLLECTION": {
+      "value": "law_chunks",
+      "description": "Qdrant collection name"
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL database URL (will be auto-provisioned)"
+    },
+    "STRIPE_SECRET_KEY": {
+      "description": "Stripe secret key"
+    },
+    "STRIPE_PUBLISHABLE_KEY": {
+      "description": "Stripe publishable key"
+    },
+    "STRIPE_WEBHOOK_SECRET": {
+      "description": "Stripe webhook secret"
+    },
+    "STRIPE_MONTHLY_PRICE_ID": {
+      "description": "Stripe monthly price ID"
+    },
+    "STRIPE_YEARLY_PRICE_ID": {
+      "description": "Stripe yearly price ID"
+    },
+    "FRONTEND_URL": {
+      "description": "Frontend URL for CORS and redirects"
+    },
+    "GOOGLE_CLIENT_ID": {
+      "description": "Google OAuth client ID"
+    },
+    "DISABLE_SUBSCRIPTION": {
+      "value": "false",
+      "description": "Whether to disable subscription features"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "alembic upgrade head"
+  }
+}
