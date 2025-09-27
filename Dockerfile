@@ -21,6 +21,3 @@ RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE $PORT
-
-# Run database migrations and start server
-CMD alembic upgrade head && uvicorn api_server:app --host 0.0.0.0 --port $PORT
