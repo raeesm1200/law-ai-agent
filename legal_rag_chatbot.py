@@ -35,15 +35,39 @@ colorama.init(autoreset=True)
 load_dotenv()
 
 
-class CustomEmbeddings:
-    """Custom embeddings wrapper that uses a single SentenceTransformer model."""
+class DiskCachedEmbeddings:
+    """Memory-efficient embeddings that load model on-demand and cache to disk."""
     
-    def __init__(self, sentence_transformer):
-        self.sentence_transformer = sentence_transformer
+    def __init__(self, model_name, cache_dir="/tmp/sentence_transformers"):
+        self.model_name = model_name
+        self.cache_dir = cache_dir
+        self._model = None
+        
+        # Set environment variables for disk caching
+        import os
+        os.environ['SENTENCE_TRANSFORMERS_HOME'] = cache_dir
+        os.environ['TRANSFORMERS_CACHE'] = cache_dir
+        
+        # Ensure cache directory exists
+        os.makedirs(cache_dir, exist_ok=True)
+    
+    def _get_model(self):
+        """Lazy load the model only when needed."""
+        if self._model is None:
+            print(f"🔄 Loading embedding model to disk cache: {self.model_name}")
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer(
+                self.model_name,
+                device='cpu',
+                cache_folder=self.cache_dir
+            )
+            print("✅ Model loaded and cached to disk")
+        return self._model
     
     def embed_documents(self, texts):
         """Embed a list of documents."""
-        return self.sentence_transformer.encode(
+        model = self._get_model()
+        return model.encode(
             texts, 
             normalize_embeddings=True,
             convert_to_numpy=True
@@ -51,11 +75,21 @@ class CustomEmbeddings:
     
     def embed_query(self, text):
         """Embed a single query."""
-        return self.sentence_transformer.encode(
+        model = self._get_model()
+        return model.encode(
             [text], 
             normalize_embeddings=True,
             convert_to_numpy=True
         )[0].tolist()
+    
+    def cleanup_memory(self):
+        """Free the model from memory (will be reloaded when needed)."""
+        if self._model is not None:
+            del self._model
+            self._model = None
+            import gc
+            gc.collect()
+            print("🧹 Embedding model freed from memory")
 
 
 class LegalRAGChatbot:
@@ -91,9 +125,12 @@ class LegalRAGChatbot:
         self.qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
         
-        # Model Configuration
+        # Model Configuration - DISK-BASED LOADING
         self.embedding_model_name = "intfloat/multilingual-e5-base"
         self.llm_model_name = "llama-3.3-70b-versatile"  
+        
+        # Set up disk caching for models (Heroku has /tmp directory)
+        self.model_cache_dir = "/tmp/sentence_transformers"
         
         print(f"{Fore.GREEN}✅ Configuration loaded successfully{Style.RESET_ALL}")
         
@@ -114,21 +151,17 @@ class LegalRAGChatbot:
             raise
             
     def setup_embeddings(self):
-        """Initialize the embedding model - MEMORY OPTIMIZED: Load only ONE model."""
+        """Initialize disk-cached embeddings - MEMORY OPTIMIZED: Lazy loading."""
         try:
-            # Load only ONE sentence transformer model
-            from sentence_transformers import SentenceTransformer
-            self.sentence_transformer = SentenceTransformer(
-                self.embedding_model_name,
-                device='cpu'
+            # Create disk-cached embeddings (loads model only when needed)
+            self.embeddings = DiskCachedEmbeddings(
+                model_name=self.embedding_model_name,
+                cache_dir=self.model_cache_dir
             )
             
-            # Create a custom embeddings wrapper that uses our single model
-            self.embeddings = CustomEmbeddings(self.sentence_transformer)
-            
-            print(f"{Fore.GREEN}✅ Embeddings initialized (memory optimized): {self.embedding_model_name}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Disk-cached embeddings ready: {self.embedding_model_name}{Style.RESET_ALL}")
         except Exception as e:
-            print(f"{Fore.RED}❌ Failed to initialize embeddings: {e}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ Failed to setup embeddings: {e}{Style.RESET_ALL}")
             raise
             
     def setup_vector_store(self):
