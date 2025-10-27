@@ -41,9 +41,6 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 
 
 
-# =============================================================================
-# PASSWORD RESET ENDPOINTS (must be after app and schemas)
-# =============================================================================
 
 from jose import jwt
 from starlette.background import BackgroundTasks
