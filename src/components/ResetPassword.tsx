@@ -1,14 +1,9 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { apiClient } from '../lib/api';
 
-function useQuery() {
-  return new URLSearchParams(useLocation().search);
-}
-
 const ResetPassword: React.FC = () => {
-  const query = useQuery();
-  const navigate = useNavigate();
+  // Use window.location so this component works without react-router's Router context
+  const query = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const token = query.get("token") || "";
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,8 +29,9 @@ const ResetPassword: React.FC = () => {
     setLoading(true);
     try {
       await apiClient.resetPassword(token, newPassword);
-      setSuccess(true);
-      setTimeout(() => navigate("/login"), 2500);
+  setSuccess(true);
+  // Redirect to login after short delay (use full navigation so component works without react-router)
+  setTimeout(() => { window.location.href = '/login'; }, 2500);
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
     } finally {
