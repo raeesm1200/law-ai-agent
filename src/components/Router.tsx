@@ -1,4 +1,7 @@
+
 import React from 'react';
+import ForgotPassword from './ForgotPassword';
+import ResetPassword from './ResetPassword';
 
 interface Route {
   path: string;
@@ -20,6 +23,13 @@ export const Router: React.FC<RouterProps> = ({ routes }) => {
     availableRoutes: routes.map(r => r.path)
   });
   
+  // Add built-in routes for password reset
+  if (currentPath === '/forgot-password') {
+    return <ForgotPassword />;
+  }
+  if (currentPath.startsWith('/reset-password')) {
+    return <ResetPassword />;
+  }
   // Find route by exact path match, ignoring query parameters
   const currentRoute = routes.find(route => route.path === currentPath);
   

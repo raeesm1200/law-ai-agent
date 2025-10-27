@@ -1,15 +1,15 @@
 import axios from 'axios';
 
-// Smart API URL detection for deployment
+// Smart API URL detection for Render deployment
 const getAPIBaseURL = () => {
   // If environment variable is set, use it
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // If we're on Render (onrender.com domain), use the new Heroku backend URL
+  // If we're on Render (onrender.com domain), use the Modal backend URL
   if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-    return 'https://law-agent-ai-prod-91772216e445.herokuapp.com';
+    return 'https://cybophee2001--legal-rag-chatbot-api-api-server.modal.run';
   }
   
   // Development fallback
