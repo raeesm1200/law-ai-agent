@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { apiClient } from '../lib/api';
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -32,15 +33,7 @@ const ResetPassword: React.FC = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, new_password: newPassword }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Failed to reset password.");
-      }
+      await apiClient.resetPassword(token, newPassword);
       setSuccess(true);
       setTimeout(() => navigate("/login"), 2500);
     } catch (err: any) {

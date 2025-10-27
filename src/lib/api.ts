@@ -1,3 +1,14 @@
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    try {
+      await this.client.post('/api/auth/reset-password', {
+        token,
+        new_password: newPassword
+      });
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error.message || 'Failed to reset password';
+      throw new Error(msg);
+    }
+  }
 import axios from 'axios';
 
 // Smart API URL detection for Render deployment
@@ -87,6 +98,7 @@ export interface FeatureFlags {
   subscription_disabled: boolean;
 }
 
+
 class ApiClient {
   private client = axios.create({
     baseURL: API_BASE_URL,
@@ -128,6 +140,18 @@ class ApiClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    try {
+      await this.client.post('/api/auth/reset-password', {
+        token,
+        new_password: newPassword
+      });
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error.message || 'Failed to reset password';
+      throw new Error(msg);
+    }
   }
 
   // Authentication endpoints
