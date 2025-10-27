@@ -130,12 +130,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                             setIsLoading(true);
                             setError("");
                             try {
-                              const res = await fetch("/api/auth/request-password-reset", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ email }),
-                              });
-                              if (!res.ok) throw new Error("Failed to send reset email.");
+                              // Use shared ApiClient so production builds use VITE_API_URL
+                              await apiClient.requestPasswordReset(email);
                               setForgotSubmitted(true);
                             } catch (err: any) {
                               setError(err.message || "Something went wrong.");
