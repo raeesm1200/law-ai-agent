@@ -1,11 +1,4 @@
-  async requestPasswordReset(email: string): Promise<void> {
-    try {
-      await this.client.post('/api/auth/request-password-reset', { email });
-    } catch (error: any) {
-      const msg = error?.response?.data?.detail || error.message || 'Failed to send reset email';
-      throw new Error(msg);
-    }
-  }
+
 import axios from 'axios';
 
 // Smart API URL detection for Render deployment
