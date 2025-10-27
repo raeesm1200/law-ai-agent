@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 FastAPI backend for Legal RAG Chatbot with Stripe Subscription Integration
@@ -33,6 +34,72 @@ from auth import (
 )
 from stripe_service import get_stripe_service
 import logging
+
+
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+
+
+
+
+# =============================================================================
+# PASSWORD RESET ENDPOINTS (must be after app and schemas)
+# =============================================================================
+
+from jose import jwt
+from starlette.background import BackgroundTasks
+
+SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
+ALGORITHM = "HS256"
+
+def create_password_reset_token(email: str) -> str:
+    expire = datetime.utcnow() + timedelta(hours=1)
+    to_encode = {"sub": email, "exp": expire}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def send_reset_email(email: str, token: str):
+    reset_link = f"https://onir.world/reset-password?token={token}"
+    template_path = os.path.join(os.path.dirname(__file__), "templates", "password_reset_email.html")
+    with open(template_path, "r", encoding="utf-8") as f:
+        html = f.read().replace("{{RESET_LINK}}", reset_link)
+    message = MessageSchema(
+        subject="Password Reset Request",
+        recipients=[email],
+        body=html,
+        subtype="html"
+    )
+    await fast_mail.send_message(message)
+
+
+# Utility function for timezone-aware conversion
+def _to_utc_aware(dt):
+    if not dt:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc)
+    return dt.replace(tzinfo=timezone.utc)
+
+# Password reset schemas (must be after BaseModel/EmailStr import)
+from pydantic import BaseModel, EmailStr
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+from dotenv import load_dotenv
+load_dotenv()
+
+mail_conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT", 465)),
+    MAIL_SERVER=os.getenv("MAIL_SERVER"),
+    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", "False").lower() == "true",
+    MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", "True").lower() == "true",
+    MAIL_FROM_NAME=os.getenv("MAIL_FROM_NAME", "Onir World"),
+)
+fast_mail = FastMail(mail_conf)
 
 
 def require_stripe_service():
@@ -112,6 +179,41 @@ security = HTTPBearer()
 # =============================================================================
 # AUTHENTICATION ENDPOINTS
 # =============================================================================
+
+# =============================================================================
+# PASSWORD RESET ENDPOINTS (must be after app and schemas)
+# =============================================================================
+
+from fastapi import BackgroundTasks
+
+@app.post("/api/auth/request-password-reset")
+async def request_password_reset(request: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Request a password reset email"""
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        # Do not reveal whether the email exists
+        return {"message": "If the email exists, a reset link has been sent."}
+    token = create_password_reset_token(user.email)
+    background_tasks.add_task(send_reset_email, user.email, token)
+    return {"message": "If the email exists, a reset link has been sent."}
+
+@app.post("/api/auth/reset-password")
+async def reset_password(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    """Reset password using token"""
+    try:
+        payload = jwt.decode(data.token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=400, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.hashed_password = get_password_hash(data.new_password)
+    db.add(user)
+    db.commit()
+    return {"message": "Password reset successful"}
 
 @app.post("/api/auth/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
