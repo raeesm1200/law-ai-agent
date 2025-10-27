@@ -1,11 +1,8 @@
-  async resetPassword(token: string, newPassword: string): Promise<void> {
+  async requestPasswordReset(email: string): Promise<void> {
     try {
-      await this.client.post('/api/auth/reset-password', {
-        token,
-        new_password: newPassword
-      });
+      await this.client.post('/api/auth/request-password-reset', { email });
     } catch (error: any) {
-      const msg = error?.response?.data?.detail || error.message || 'Failed to reset password';
+      const msg = error?.response?.data?.detail || error.message || 'Failed to send reset email';
       throw new Error(msg);
     }
   }
@@ -100,6 +97,15 @@ export interface FeatureFlags {
 
 
 class ApiClient {
+  async requestPasswordReset(email: string): Promise<void> {
+    try {
+      await this.client.post('/api/auth/request-password-reset', { email });
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error.message || 'Failed to send reset email';
+      throw new Error(msg);
+    }
+  }
+
   private client = axios.create({
     baseURL: API_BASE_URL,
     headers: {
@@ -141,6 +147,7 @@ class ApiClient {
       }
     );
   }
+
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
     try {

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { apiClient } from '../lib/api';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -11,12 +12,7 @@ const ForgotPassword: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/request-password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) throw new Error("Failed to send reset email.");
+      await apiClient.requestPasswordReset(email);
       setSubmitted(true);
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
