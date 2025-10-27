@@ -455,6 +455,8 @@ function App() {
   const routes = [
     { path: '/', component: () => <ProtectedRoute requireSubscription={false}><ChatApp /></ProtectedRoute> },
     { path: '/login', component: LoginPage },
+    { path: '/forgot-password', component: LoginPage },
+    { path: '/reset-password', component: LoginPage },
     { path: '/subscription', component: () => <ProtectedRoute><SubscriptionPlans /></ProtectedRoute> },
     { path: '/subscription/success', component: () => <ProtectedRoute><SubscriptionSuccess /></ProtectedRoute> },
     { path: '/subscription/cancel', component: () => <ProtectedRoute><SubscriptionCancel /></ProtectedRoute> },

@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { apiClient } from '../lib/api';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Label } from './ui/label';
 
 const ResetPassword: React.FC = () => {
-  // Use window.location so this component works without react-router's Router context
   const query = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const token = query.get("token") || "";
   const [newPassword, setNewPassword] = useState("");
@@ -29,9 +32,8 @@ const ResetPassword: React.FC = () => {
     setLoading(true);
     try {
       await apiClient.resetPassword(token, newPassword);
-  setSuccess(true);
-  // Redirect to login after short delay (use full navigation so component works without react-router)
-  setTimeout(() => { window.location.href = '/login'; }, 2500);
+      setSuccess(true);
+      setTimeout(() => { window.location.href = '/login'; }, 2000);
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -40,49 +42,88 @@ const ResetPassword: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
-      <div className="bg-slate-800 rounded-lg shadow-lg p-8 w-full max-w-md mt-12">
-        <h2 className="text-2xl font-bold mb-6 text-sky-400 text-center">Reset Password</h2>
-        {success ? (
-          <div className="text-center text-green-400">
-            Password reset successful! Redirecting to login...
+    <div className="auth-theme auth-background fixed inset-0 z-40 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' as any }}>
+      <div className="grid min-h-screen grid-cols-1 md:[grid-template-columns:55%_45%]">
+        {/* Left hero / branding (same as login page) */}
+        <aside className="hidden md:flex flex-col items-center text-center justify-center gap-6 p-20 md:p-28 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 text-white auth-hero">
+          <div className="inline-flex items-center justify-center bg-white/12 rounded-xl p-3 shadow-md">
+            <img src="/onir-logo.png" alt="Logo" className="h-10 w-10 object-contain" />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="new-password" className="block mb-2 text-sm font-medium">New Password</label>
-              <input
-                id="new-password"
-                type="password"
-                className="w-full px-4 py-2 rounded bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                required
-                minLength={8}
-              />
+          <div>
+            <div className="text-sm opacity-90 mb-4">Legal AI</div>
+            <h2 className="text-4xl md:text-5xl font-extrabold">Legal AI Assistant</h2>
+            <p className="mt-4 text-lg md:text-xl opacity-90 max-w-xl mx-auto">Fast, accurate Italian legal guidance powered by AI. Secure & private for professional use.</p>
+          </div>
+
+          <div className="mt-8 p-6 bg-white/8 rounded-lg border border-white/6 max-w-md">
+            <p className="text-sm md:text-base">Try the assistant with one of our subscription plans to unlock full access.</p>
+          </div>
+        </aside>
+
+        {/* Right: reset card */}
+        <main className="flex items-start md:items-center justify-center p-6 sm:p-8 bg-card overflow-auto py-12 md:py-0">
+          <div className="w-full max-w-md sm:max-w-lg md:max-w-xl">
+            <div className="auth-outer-card w-full px-2 sm:px-0">
+              <Card className="auth-card auth-inner-card">
+                <CardHeader className="text-center">
+                  <img src="/onir-logo.png" alt="ONIR" className="mx-auto h-10 w-10 object-contain" />
+                  <CardTitle className="text-2xl font-bold mt-2">Reset Password</CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">
+                    Enter a new password for your account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {success ? (
+                    <div className="text-center text-green-400">
+                      Password reset successful! Redirecting to login...
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+                      <div>
+                        <Label htmlFor="new-password">New Password</Label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          placeholder="Create a password (min 8 characters)"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          disabled={loading}
+                          className="mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-password">Confirm Password</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          placeholder="Confirm your password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          disabled={loading}
+                          className="mt-2"
+                        />
+                      </div>
+                      {error && <div className="text-red-400 text-sm">{error}</div>}
+                      <div className="flex items-center justify-between gap-4">
+                        <a
+                          href="#"
+                          className="text-sm text-blue-600 hover:underline font-normal"
+                          style={{ background: 'none', border: 'none', padding: 0, outline: 'none', cursor: 'pointer' }}
+                          onClick={(e) => { e.preventDefault(); window.location.href = '/login'; }}
+                        >
+                          Back to Login
+                        </a>
+                        <Button type="submit" className="py-2 px-4 bg-sky-400 text-slate-900 font-semibold rounded hover:bg-sky-300 transition" disabled={loading}>
+                          {loading ? 'Resetting...' : 'Reset Password'}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-            <div>
-              <label htmlFor="confirm-password" className="block mb-2 text-sm font-medium">Confirm Password</label>
-              <input
-                id="confirm-password"
-                type="password"
-                className="w-full px-4 py-2 rounded bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
-            {error && <div className="text-red-400 text-sm">{error}</div>}
-            <button
-              type="submit"
-              className="w-full py-2 px-4 bg-sky-400 text-slate-900 font-semibold rounded hover:bg-sky-300 transition"
-              disabled={loading}
-            >
-              {loading ? "Resetting..." : "Reset Password"}
-            </button>
-          </form>
-        )}
+          </div>
+        </main>
       </div>
     </div>
   );
