@@ -54,7 +54,7 @@ def create_password_reset_token(email: str) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def send_reset_email(email: str, token: str):
-    reset_link = f"https://onir.world/reset-password?token={token}"
+    reset_link = f"{os.getenv('FRONTEND_URL')}/reset-password?token={token}"
     template_path = os.path.join(os.path.dirname(__file__), "templates", "password_reset_email.html")
     with open(template_path, "r", encoding="utf-8") as f:
         html = f.read().replace("{{RESET_LINK}}", reset_link)
