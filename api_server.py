@@ -977,8 +977,8 @@ async def chat_endpoint(
         # Check if user has any subscription access (active or canceled with future end_date)
         has_subscription_access = active_subscription is not None
 
-        # Enforce trial limit: 20 questions if not subscribed AND no valid canceled subscription
-        if (current_user.questions_used is not None and current_user.questions_used >= 20) and not has_subscription_access:
+    # Enforce trial limit: 10 questions if not subscribed AND no valid canceled subscription
+    if (current_user.questions_used is not None and current_user.questions_used >= 10) and not has_subscription_access:
             raise HTTPException(status_code=403, detail={"error": "Trial limit reached. Please subscribe to continue."})
 
     try:
