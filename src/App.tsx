@@ -80,7 +80,7 @@ const ChatApp: React.FC = () => {
   const handleSendMessage = async (message: string) => {
     // Skip trial enforcement if subscriptions are disabled
     if (!featureFlags?.subscription_disabled) {
-      // Client-side trial enforcement: allow up to 20 free messages if user has no active subscription access
+  // Client-side trial enforcement: allow up to 10 free messages if user has no active subscription access
       const questionsUsed = user?.questions_used || 0;
       
       // Check if user has subscription access (active subscription or canceled but still valid)
@@ -89,7 +89,7 @@ const ChatApp: React.FC = () => {
                                     subscription?.end_date && 
                                     new Date(subscription.end_date) > new Date());
 
-      if (!hasSubscriptionAccess && questionsUsed >= 20) {
+  if (!hasSubscriptionAccess && questionsUsed >= 10) {
         // Redirect to subscription page
         window.location.href = '/subscription';
         return;
@@ -339,7 +339,7 @@ const ChatApp: React.FC = () => {
           selectedLanguage={selectedLanguage}
           onLogout={logout}
           questionsUsed={user?.questions_used || 0}
-          maxTrial={20}
+          maxTrial={10}
           subscription={subscription || null}
         />
       </div>
@@ -372,7 +372,7 @@ const ChatApp: React.FC = () => {
               selectedLanguage={selectedLanguage}
               onLogout={logout}
               questionsUsed={user?.questions_used || 0}
-              maxTrial={20}
+              maxTrial={10}
               subscription={subscription || null}
             />
           </div>
