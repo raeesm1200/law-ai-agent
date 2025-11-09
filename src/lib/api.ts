@@ -331,6 +331,16 @@ class ApiClient {
     }
   }
 
+  async deleteConversation(conversationId: string): Promise<{ status: string }> {
+    try {
+      const response = await this.client.delete(`/api/chat/conversation/${conversationId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete Conversation Error:', error);
+      throw new Error('Failed to delete conversation');
+    }
+  }
+
   async getFeatureFlags(): Promise<FeatureFlags> {
     try {
       const response = await this.client.get('/api/feature-flags');

@@ -260,11 +260,25 @@ const ChatApp: React.FC = () => {
     }
   };
 
-  const handleDeleteConversation = (conversationId: string) => {
-    setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-    
-    if (activeConversationId === conversationId) {
-      setActiveConversationId(null);
+  const handleDeleteConversation = async (conversationId: string) => {
+    try {
+      // Call backend to delete the conversation
+      await apiClient.deleteConversation(conversationId);
+      
+      // Remove from local state
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      
+      // Clear active conversation if it was the deleted one
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      // Still remove from UI even if backend fails
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null);
+      }
     }
   };
 
