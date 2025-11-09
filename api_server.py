@@ -126,6 +126,9 @@ async def lifespan(app: FastAPI):
     try:
         print("🚀 Initializing Legal RAG Chatbot with Stripe integration...")
 
+        # Log the DISABLE_SUBSCRIPTION env var value
+        print(f"[ENV] DISABLE_SUBSCRIPTION is set to: {DISABLE_SUBSCRIPTION}")
+
         # Create database tables
         create_tables()
         print("✅ Database tables created successfully!")
@@ -1159,6 +1162,32 @@ async def save_chat_history(
     # This endpoint can be used for bulk saves if needed
     # Individual messages are already saved in the chat endpoint
     return {"status": "saved"}
+
+@app.delete("/api/chat/conversation/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a specific conversation and all its messages"""
+    try:
+        # Delete all chat history records for this conversation and user
+        deleted_count = db.query(ChatHistory).filter(
+            ChatHistory.conversation_id == conversation_id,
+            ChatHistory.user_id == current_user.id
+        ).delete()
+        
+        db.commit()
+        
+        return {
+            "status": "deleted",
+            "conversation_id": conversation_id,
+            "messages_deleted": deleted_count
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting conversation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete conversation")
 
 @app.get("/")
 async def root():
