@@ -583,6 +583,56 @@ async def get_subscription_status(
         "end_date": subscription.end_date
     }
 
+@app.get("/api/detect-currency")
+async def detect_currency(request: Request):
+    """
+    Detect user's currency based on their IP address geolocation
+    """
+    try:
+        import requests as http_requests
+        
+        # Get client IP address
+        client_ip = request.client.host
+        
+        # If behind proxy (like nginx, Heroku, Render), get real IP from headers
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+        
+        # For localhost/testing, default to USD
+        if client_ip in ["127.0.0.1", "localhost", "::1"]:
+            return {"currency": "usd", "ip": "localhost", "country": "US"}
+        
+        # Call ip-api.com for geolocation (free, no API key needed)
+        response = http_requests.get(f"http://ip-api.com/json/{client_ip}", timeout=3)
+        data = response.json()
+        
+        if data.get("status") == "success":
+            country_code = data.get("countryCode", "US")
+            
+            # List of Eurozone countries
+            eurozone_countries = [
+                "AT", "BE", "CY", "EE", "FI", "FR", "DE", "GR", 
+                "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PT", 
+                "SK", "SI", "ES"
+            ]
+            
+            currency = "eur" if country_code in eurozone_countries else "usd"
+            
+            return {
+                "currency": currency,
+                "ip": client_ip,
+                "country": country_code
+            }
+        else:
+            # Default to USD if geolocation fails
+            return {"currency": "usd", "ip": client_ip, "country": "Unknown"}
+            
+    except Exception as e:
+        logger.error(f"Error detecting currency from IP: {e}")
+        # Default to USD on error
+        return {"currency": "usd", "ip": "error", "country": "Unknown"}
+
 @app.get("/api/subscription/plans")
 async def get_subscription_plans(currency: Optional[str] = "usd"):
     """Get available subscription plans with pricing for a specific currency"""
