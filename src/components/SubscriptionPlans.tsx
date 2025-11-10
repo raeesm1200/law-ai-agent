@@ -44,16 +44,13 @@ export const SubscriptionPlans: React.FC = () => {
           const parts = subscription.plan_type.split('_');
           if (parts.length === 2 && (parts[1] === 'usd' || parts[1] === 'eur')) {
             currency = parts[1] as 'usd' | 'eur';
-            console.log('Using existing subscription currency:', currency);
           } else {
             // Legacy plan_type without currency, detect from IP
             currency = await detectUserCurrency();
-            console.log('Detected currency from IP:', currency);
           }
         } else {
           // No subscription, detect from IP geolocation
           currency = await detectUserCurrency();
-          console.log('Detected currency from IP:', currency);
         }
         
         // Fetch plans with detected currency
@@ -237,9 +234,6 @@ export const SubscriptionPlans: React.FC = () => {
           const subscriptionValid = !!(subscription && subscription.has_subscription && (!subscriptionEndDate || subscriptionEndDate > now));
           const isCurrentPlan = subscription?.plan_type === plan.id && subscriptionValid;
           const isYearly = plan.id === 'yearly' || plan.id === 'yearly_usd' || plan.id === 'yearly_eur';
-          
-          // Debug logging
-          console.log('Plan ID:', plan.id, 'isYearly:', isYearly);
           
           return (
             <Card 
