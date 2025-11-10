@@ -189,9 +189,10 @@ class ApiClient {
   }
 
   // Subscription endpoints
-  async getSubscriptionPlans(): Promise<SubscriptionPlansResponse> {
+  async getSubscriptionPlans(currency?: string): Promise<SubscriptionPlansResponse> {
     try {
-      const response = await this.client.get('/api/subscription/plans');
+      const params = currency ? { currency } : {};
+      const response = await this.client.get('/api/subscription/plans', { params });
       return response.data;
     } catch (error) {
       console.error('Get Plans Error:', error);

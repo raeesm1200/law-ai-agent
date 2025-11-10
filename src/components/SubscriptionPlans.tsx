@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Check, Crown, Loader2, Star, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
+import { detectUserCurrency, formatPrice } from '../lib/currency';
 
 // Initialize Stripe
 // Prefer the VITE-prefixed publishable key (only VITE_ vars are exposed to the browser).
@@ -31,9 +32,35 @@ export const SubscriptionPlans: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [userCurrency, setUserCurrency] = useState<'usd' | 'eur'>('usd');
 
   useEffect(() => {
-    fetchPlans();
+    // If user has an existing subscription, use that currency
+    // Otherwise detect from browser settings
+    let currency: 'usd' | 'eur' = 'usd';
+    
+    if (subscription?.plan_type) {
+      // Extract currency from plan_type (e.g., "monthly_usd" -> "usd")
+      const parts = subscription.plan_type.split('_');
+      if (parts.length === 2 && (parts[1] === 'usd' || parts[1] === 'eur')) {
+        currency = parts[1] as 'usd' | 'eur';
+        console.log('Using existing subscription currency:', currency);
+      } else {
+        // Legacy plan_type without currency, detect from browser
+        currency = detectUserCurrency();
+        console.log('Detected currency from browser:', currency, 'from navigator.language:', navigator.language);
+      }
+    } else {
+      // No subscription, detect from browser
+      currency = detectUserCurrency();
+      console.log('Detected currency from browser:', currency, 'from navigator.language:', navigator.language);
+    }
+    
+    setUserCurrency(currency);
+    
+    // Fetch plans with detected currency
+    fetchPlans(currency);
+    
     // Refresh subscription status on mount so UI reflects any recent webhook updates
     (async () => {
       try {
@@ -46,11 +73,11 @@ export const SubscriptionPlans: React.FC = () => {
     if (!STRIPE_PUBLISHABLE_KEY) {
       setError('Stripe publishable key not found in frontend environment. Set VITE_STRIPE_PUBLISHABLE_KEY in .env and restart the dev server.');
     }
-  }, []);
+  }, [subscription?.plan_type]);
 
-  const fetchPlans = async () => {
+  const fetchPlans = async (currency: string) => {
     try {
-      const response = await apiClient.getSubscriptionPlans();
+      const response = await apiClient.getSubscriptionPlans(currency);
       setPlans(response.plans);
     } catch (error) {
       setError('Failed to load subscription plans');
@@ -202,7 +229,7 @@ export const SubscriptionPlans: React.FC = () => {
           // and either no end_date is set (recurring) or the end_date is in the future.
           const subscriptionValid = !!(subscription && subscription.has_subscription && (!subscriptionEndDate || subscriptionEndDate > now));
           const isCurrentPlan = subscription?.plan_type === plan.id && subscriptionValid;
-          const isYearly = plan.id === 'yearly';
+          const isYearly = plan.id === 'yearly' || plan.id === 'yearly_usd' || plan.id === 'yearly_eur';
           
           return (
             <Card 
@@ -227,7 +254,7 @@ export const SubscriptionPlans: React.FC = () => {
                 </CardTitle>
                 <CardDescription>
                   <span className="text-3xl font-bold">
-                    ${plan.price}
+                    {formatPrice(plan.price, plan.currency)}
                   </span>
                   <span className="text-muted-foreground">
                     /{plan.interval}
