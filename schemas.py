@@ -58,6 +58,7 @@ class SubscriptionResponse(SubscriptionBase):
 # Stripe schemas
 class CreateCheckoutSessionRequest(BaseModel):
     plan_type: str  # 'monthly' or 'yearly'
+    currency: Optional[str] = "usd"  # 'usd' or 'eur'
 
 class CreateCheckoutSessionResponse(BaseModel):
     session_id: str

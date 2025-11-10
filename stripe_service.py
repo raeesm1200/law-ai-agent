@@ -19,8 +19,21 @@ class StripeService:
         self.publishable_key = os.getenv("STRIPE_PUBLISHABLE_KEY")
         self.secret_key = os.getenv("STRIPE_SECRET_KEY")
         self.webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-        self.monthly_price_id = os.getenv("STRIPE_MONTHLY_PRICE_ID")
-        self.yearly_price_id = os.getenv("STRIPE_YEARLY_PRICE_ID")
+        
+        # Multiple price IDs for different currencies and intervals
+        self.price_ids = {
+            "monthly_usd": os.getenv("STRIPE_MONTHLY_USD_PRICE_ID"),
+            "yearly_usd": os.getenv("STRIPE_YEARLY_USD_PRICE_ID"),
+            "monthly_eur": os.getenv("STRIPE_MONTHLY_EUR_PRICE_ID"),
+            "yearly_eur": os.getenv("STRIPE_YEARLY_EUR_PRICE_ID"),
+        }
+        
+        # Legacy support (fallback to old env vars if new ones not set)
+        if not self.price_ids["monthly_usd"]:
+            self.price_ids["monthly_usd"] = os.getenv("STRIPE_MONTHLY_PRICE_ID")
+        if not self.price_ids["yearly_usd"]:
+            self.price_ids["yearly_usd"] = os.getenv("STRIPE_YEARLY_PRICE_ID")
+        
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         
         if not self.secret_key:
@@ -43,19 +56,19 @@ class StripeService:
         customer_id: str,
         plan_type: str,
         user_id: int,
+        currency: str = "usd",
     ) -> Any:
         """Create a Stripe Checkout Session for subscription"""
         try:
-            # Determine price ID based on plan type
-            if plan_type == "monthly":
-                price_id = self.monthly_price_id
-            elif plan_type == "yearly":
-                price_id = self.yearly_price_id
-            else:
-                raise ValueError("Invalid plan type. Must be 'monthly' or 'yearly'")
+            # Determine price ID based on plan type and currency
+            price_key = f"{plan_type}_{currency.lower()}"
+            price_id = self.price_ids.get(price_key)
             
             if not price_id:
-                raise ValueError(f"Price ID not configured for {plan_type} plan")
+                raise ValueError(f"Price ID not configured for {plan_type} plan in {currency.upper()}")
+            
+            if not price_id:
+                raise ValueError(f"Price ID not configured for {plan_type} plan in {currency.upper()}")
             
             # Create the session (minimal logging to avoid leaking sensitive info)
             session = stripe.checkout.Session.create(
@@ -71,13 +84,15 @@ class StripeService:
                 # Session-level metadata
                 metadata={
                     "user_id": str(user_id),
-                    "plan_type": plan_type,
+                    "plan_type": f"{plan_type}_{currency}",
+                    "currency": currency,
                 },
                 # Subscription-level metadata (this is what invoices/webhooks see)
                 subscription_data={
                     "metadata": {
                         "user_id": str(user_id),
-                        "plan_type": plan_type,
+                        "plan_type": f"{plan_type}_{currency}",
+                        "currency": currency,
                         "created_by_user_id": str(user_id),
                     }
                 }
@@ -156,18 +171,14 @@ class StripeService:
         except Exception as e:
             raise Exception(f"Failed to retrieve customer: {str(e)}")
     
-    def get_price_info(self, plan_type: str) -> Dict[str, Any]:
-        """Get price information for a plan"""
+    def get_price_info(self, plan_type: str, currency: str = "usd") -> Dict[str, Any]:
+        """Get price information for a plan in a specific currency"""
         try:
-            if plan_type == "monthly":
-                price_id = self.monthly_price_id
-            elif plan_type == "yearly":
-                price_id = self.yearly_price_id
-            else:
-                raise ValueError("Invalid plan type")
+            price_key = f"{plan_type}_{currency.lower()}"
+            price_id = self.price_ids.get(price_key)
             
             if not price_id:
-                raise ValueError(f"Price ID not configured for {plan_type} plan")
+                raise ValueError(f"Price ID not configured for {plan_type} plan in {currency.upper()}")
             
             price = stripe.Price.retrieve(price_id)
             return {
@@ -179,6 +190,24 @@ class StripeService:
             }
         except Exception as e:
             raise Exception(f"Failed to get price info: {str(e)}")
+    
+    def get_all_prices(self) -> Dict[str, Dict[str, Any]]:
+        """Get all available price information for all configured plans"""
+        prices = {}
+        for key, price_id in self.price_ids.items():
+            if price_id:
+                try:
+                    price = stripe.Price.retrieve(price_id)
+                    prices[key] = {
+                        "id": price.id,
+                        "amount": price.unit_amount,
+                        "currency": price.currency,
+                        "interval": price.recurring.interval if price.recurring else None,
+                        "interval_count": price.recurring.interval_count if price.recurring else None
+                    }
+                except Exception as e:
+                    print(f"Warning: Failed to retrieve price for {key}: {str(e)}")
+        return prices
 
 # Provide a runtime-safe factory to instantiate a singleton StripeService.
 from threading import Lock

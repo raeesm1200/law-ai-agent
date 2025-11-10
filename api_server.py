@@ -399,10 +399,39 @@ async def create_checkout_session(
             except Exception as e:
                 raise Exception(f"Failed to create Stripe customer for user: {str(e)}")
 
+        # Extract currency from plan_type (e.g., "monthly_usd" -> "usd")
+        plan_parts = request.plan_type.split('_')
+        if len(plan_parts) == 2:
+            plan_interval, currency = plan_parts
+        else:
+            # Legacy format: just "monthly" or "yearly"
+            plan_interval = request.plan_type
+            currency = "usd"  # default
+
+        # Check if user has an existing subscription with a different currency
+        # Stripe doesn't allow mixing currencies for a single customer
+        existing_sub = db.query(Subscription).filter(
+            Subscription.user_id == current_user.id,
+            Subscription.stripe_subscription_id.isnot(None)
+        ).first()
+        
+        if existing_sub:
+            # Extract currency from existing plan_type
+            existing_parts = existing_sub.plan_type.split('_')
+            existing_currency = existing_parts[1] if len(existing_parts) == 2 else 'usd'
+            
+            if existing_currency != currency:
+                raise Exception(
+                    f"You have an existing subscription in {existing_currency.upper()}. "
+                    f"Stripe does not allow mixing currencies. Please cancel your current "
+                    f"subscription before subscribing to a plan in {currency.upper()}."
+                )
+
         session = get_stripe_service().create_checkout_session(
             customer_id=current_user.stripe_customer_id,
-            plan_type=request.plan_type,
-            user_id=current_user.id
+            plan_type=plan_interval,
+            user_id=current_user.id,
+            currency=currency
         )
 
         return CreateCheckoutSessionResponse(
@@ -555,20 +584,25 @@ async def get_subscription_status(
     }
 
 @app.get("/api/subscription/plans")
-async def get_subscription_plans():
-    """Get available subscription plans with pricing"""
+async def get_subscription_plans(currency: Optional[str] = "usd"):
+    """Get available subscription plans with pricing for a specific currency"""
     try:
-        monthly_price = get_stripe_service().get_price_info("monthly")
-        yearly_price = get_stripe_service().get_price_info("yearly")
+        # Normalize currency
+        currency = currency.lower() if currency else "usd"
+        
+        # Get prices for the specified currency
+        monthly_price = get_stripe_service().get_price_info("monthly", currency)
+        yearly_price = get_stripe_service().get_price_info("yearly", currency)
         
         return {
             "plans": [
                 {
-                    "id": "monthly",
+                    "id": f"monthly_{currency}",
                     "name": "Monthly Plan",
                     "price": monthly_price["amount"] / 100,  # Convert from cents
-                    "currency": monthly_price["currency"],
+                    "currency": monthly_price["currency"].upper(),
                     "interval": "month",
+                    "plan_type": "monthly",
                     "features": [
                         "Unlimited legal consultations",
                         "Access to Italian legal database",
@@ -577,11 +611,12 @@ async def get_subscription_plans():
                     ]
                 },
                 {
-                    "id": "yearly",
+                    "id": f"yearly_{currency}",
                     "name": "Yearly Plan",
                     "price": yearly_price["amount"] / 100,  # Convert from cents
-                    "currency": yearly_price["currency"],
+                    "currency": yearly_price["currency"].upper(),
                     "interval": "year",
+                    "plan_type": "yearly",
                     "features": [
                         "Unlimited legal consultations",
                         "Access to Italian legal database",
