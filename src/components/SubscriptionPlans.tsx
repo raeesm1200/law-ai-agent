@@ -32,7 +32,6 @@ export const SubscriptionPlans: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [userCurrency, setUserCurrency] = useState<'usd' | 'eur'>('usd');
 
   useEffect(() => {
     const initializePlans = async () => {
@@ -56,8 +55,6 @@ export const SubscriptionPlans: React.FC = () => {
           currency = await detectUserCurrency();
           console.log('Detected currency from IP:', currency);
         }
-        
-        setUserCurrency(currency);
         
         // Fetch plans with detected currency
         await fetchPlans(currency);
@@ -240,6 +237,9 @@ export const SubscriptionPlans: React.FC = () => {
           const subscriptionValid = !!(subscription && subscription.has_subscription && (!subscriptionEndDate || subscriptionEndDate > now));
           const isCurrentPlan = subscription?.plan_type === plan.id && subscriptionValid;
           const isYearly = plan.id === 'yearly' || plan.id === 'yearly_usd' || plan.id === 'yearly_eur';
+          
+          // Debug logging
+          console.log('Plan ID:', plan.id, 'isYearly:', isYearly);
           
           return (
             <Card 
