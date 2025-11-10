@@ -244,7 +244,7 @@ export const SubscriptionPlans: React.FC = () => {
           return (
             <Card 
               key={plan.id} 
-              className={`relative ${isYearly ? 'border-primary shadow-lg scale-105' : ''}`}
+              className={`relative ${isYearly ? 'border-2 border-primary shadow-lg scale-105' : ''}`}
             >
               {isYearly && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
