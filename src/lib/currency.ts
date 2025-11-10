@@ -2,38 +2,33 @@
  * Currency detection and formatting utilities
  */
 
-// List of EU countries that use EUR
-const EU_COUNTRIES = [
-  'AT', 'BE', 'CY', 'EE', 'FI', 'FR', 'DE', 'GR', 'IE', 'IT', 
-  'LV', 'LT', 'LU', 'MT', 'NL', 'PT', 'SK', 'SI', 'ES'
-];
-
 /**
- * Detect user's preferred currency based on browser settings
+ * Detect user's preferred currency based on IP geolocation
  * Returns 'eur' for EU countries, 'usd' otherwise
  */
-export function detectUserCurrency(): 'usd' | 'eur' {
+export async function detectUserCurrency(): Promise<'usd' | 'eur'> {
   try {
-    // Try to get user's locale from browser
-    const locale = navigator.language || 'en-US';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const response = await fetch(`${API_URL}/api/detect-currency`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     
-    // Extract country code (e.g., 'en-GB' -> 'GB', 'fr' -> 'FR')
-    let countryCode = locale.split('-')[1]?.toUpperCase();
-    
-    // If no country code, use language code as fallback (e.g., 'fr' -> 'FR')
-    if (!countryCode && locale.length === 2) {
-      countryCode = locale.toUpperCase();
+    if (!response.ok) {
+      console.warn('Failed to detect currency from IP, defaulting to USD');
+      return 'usd';
     }
     
-    // Check if country uses EUR
-    if (countryCode && EU_COUNTRIES.includes(countryCode)) {
-      return 'eur';
-    }
+    const data = await response.json();
+    console.log('Detected currency from IP:', data.currency, 'Country:', data.country, 'IP:', data.ip);
+    
+    return data.currency as 'usd' | 'eur';
   } catch (error) {
-    console.warn('Failed to detect currency, defaulting to USD:', error);
+    console.warn('Error detecting currency from IP, defaulting to USD:', error);
+    return 'usd';
   }
-  
-  return 'usd';
 }
 
 /**

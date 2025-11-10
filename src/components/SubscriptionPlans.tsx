@@ -35,31 +35,38 @@ export const SubscriptionPlans: React.FC = () => {
   const [userCurrency, setUserCurrency] = useState<'usd' | 'eur'>('usd');
 
   useEffect(() => {
-    // If user has an existing subscription, use that currency
-    // Otherwise detect from browser settings
-    let currency: 'usd' | 'eur' = 'usd';
-    
-    if (subscription?.plan_type) {
-      // Extract currency from plan_type (e.g., "monthly_usd" -> "usd")
-      const parts = subscription.plan_type.split('_');
-      if (parts.length === 2 && (parts[1] === 'usd' || parts[1] === 'eur')) {
-        currency = parts[1] as 'usd' | 'eur';
-        console.log('Using existing subscription currency:', currency);
-      } else {
-        // Legacy plan_type without currency, detect from browser
-        currency = detectUserCurrency();
-        console.log('Detected currency from browser:', currency, 'from navigator.language:', navigator.language);
+    const initializePlans = async () => {
+      try {
+        // If user has an existing subscription, use that currency
+        let currency: 'usd' | 'eur' = 'usd';
+        
+        if (subscription?.plan_type) {
+          // Extract currency from plan_type (e.g., "monthly_usd" -> "usd")
+          const parts = subscription.plan_type.split('_');
+          if (parts.length === 2 && (parts[1] === 'usd' || parts[1] === 'eur')) {
+            currency = parts[1] as 'usd' | 'eur';
+            console.log('Using existing subscription currency:', currency);
+          } else {
+            // Legacy plan_type without currency, detect from IP
+            currency = await detectUserCurrency();
+            console.log('Detected currency from IP:', currency);
+          }
+        } else {
+          // No subscription, detect from IP geolocation
+          currency = await detectUserCurrency();
+          console.log('Detected currency from IP:', currency);
+        }
+        
+        setUserCurrency(currency);
+        
+        // Fetch plans with detected currency
+        await fetchPlans(currency);
+      } catch (error) {
+        console.error('Error initializing plans:', error);
+        setError('Failed to initialize subscription plans');
+        setLoading(false);
       }
-    } else {
-      // No subscription, detect from browser
-      currency = detectUserCurrency();
-      console.log('Detected currency from browser:', currency, 'from navigator.language:', navigator.language);
-    }
-    
-    setUserCurrency(currency);
-    
-    // Fetch plans with detected currency
-    fetchPlans(currency);
+    };
     
     // Refresh subscription status on mount so UI reflects any recent webhook updates
     (async () => {
@@ -69,10 +76,13 @@ export const SubscriptionPlans: React.FC = () => {
         // ignore
       }
     })();
+    
     // If publishable key is missing, surface a helpful error to the UI
     if (!STRIPE_PUBLISHABLE_KEY) {
       setError('Stripe publishable key not found in frontend environment. Set VITE_STRIPE_PUBLISHABLE_KEY in .env and restart the dev server.');
     }
+    
+    initializePlans();
   }, [subscription?.plan_type]);
 
   const fetchPlans = async (currency: string) => {
