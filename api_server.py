@@ -350,20 +350,42 @@ async def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db
         if not email:
             raise RuntimeError('Verified Google token did not contain an email')
 
-        # Find or create user
-        user = db.query(User).filter(User.email == email).first()
-        if not user:
-            # Create Stripe customer
-            require_stripe_service()
-            stripe_customer = get_stripe_service().create_customer(email=email, name=email.split('@')[0])
+        # Retry logic for database operations (handles Neon free tier wake-up)
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                # Find or create user
+                user = db.query(User).filter(User.email == email).first()
+                if not user:
+                    # Create Stripe customer
+                    require_stripe_service()
+                    stripe_customer = get_stripe_service().create_customer(email=email, name=email.split('@')[0])
 
-            # Generate a random internal password and store its hash so NOT NULL constraint is satisfied.
-            random_pw = uuid.uuid4().hex
-            hashed_pw = get_password_hash(random_pw)
-            user = User(email=email, hashed_password=hashed_pw, stripe_customer_id=stripe_customer.id)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+                    # Generate a random internal password and store its hash so NOT NULL constraint is satisfied.
+                    random_pw = uuid.uuid4().hex
+                    hashed_pw = get_password_hash(random_pw)
+                    user = User(email=email, hashed_password=hashed_pw, stripe_customer_id=stripe_customer.id)
+                    db.add(user)
+                    db.commit()
+                    db.refresh(user)
+                
+                # If we got here, database operation succeeded
+                break
+                
+            except Exception as db_error:
+                # Check if it's a database connection error
+                error_msg = str(db_error).lower()
+                if 'operationalerror' in error_msg or 'connection' in error_msg:
+                    if attempt < max_retries - 1:
+                        print(f"⚠️ Database connection error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                        await asyncio.sleep(retry_delay)
+                        db.rollback()  # Rollback any failed transaction
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                # If it's not a connection error or we've exhausted retries, re-raise
+                raise
 
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
