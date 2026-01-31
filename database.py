@@ -6,6 +6,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine.url import make_url
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -22,16 +23,22 @@ if DATABASE_URL.startswith("sqlite"):
     )
 else:
     # PostgreSQL/Neon configuration
+    db_url = make_url(DATABASE_URL)
+    connect_args = {
+        "connect_timeout": 10  # Connection timeout
+    }
+
+    # Neon pooler connections reject startup parameters like statement_timeout
+    if not (db_url.host and "pooler" in db_url.host):
+        connect_args["options"] = "-c statement_timeout=30000"  # 30 second statement timeout
+
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,  # Test connections before using them (handles stale connections)
         pool_size=5,  # Reduced for Neon free tier connection limits
         max_overflow=2,  # Allow up to 2 additional connections when needed
         pool_recycle=300,  # Recycle connections after 5 minutes
-        connect_args={
-            "connect_timeout": 10,  # Connection timeout
-            "options": "-c statement_timeout=30000"  # 30 second statement timeout
-        }
+        connect_args=connect_args
     )
 
 # Create session factory
