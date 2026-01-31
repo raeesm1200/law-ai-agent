@@ -25,7 +25,11 @@ else:
     # PostgreSQL/Neon configuration
     db_url = make_url(DATABASE_URL)
     connect_args = {
-        "connect_timeout": 10  # Connection timeout
+        "connect_timeout": 10,  # Connection timeout
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5
     }
 
     # Neon pooler connections reject startup parameters like statement_timeout
@@ -35,9 +39,10 @@ else:
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,  # Test connections before using them (handles stale connections)
-        pool_size=5,  # Reduced for Neon free tier connection limits
-        max_overflow=2,  # Allow up to 2 additional connections when needed
-        pool_recycle=300,  # Recycle connections after 5 minutes
+        pool_size=3,  # Reduced for Neon pooler limits
+        max_overflow=1,  # Minimal overflow
+        pool_recycle=60,  # Recycle connections after 1 minute (Neon pooler closes idle connections quickly)
+        pool_timeout=30,  # Timeout waiting for connection from pool
         connect_args=connect_args
     )
 
