@@ -6,6 +6,7 @@ import { AuthForm } from "./components/AuthForm";
 import { SubscriptionPlans } from "./components/SubscriptionPlans";
 import { SubscriptionSuccess, SubscriptionCancel } from "./components/SubscriptionStatus";
 import { Router } from "./components/Router";
+import PrivacyPolicy from "./components/PrivacyPolicy";
 import { apiClient } from "./lib/api";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
@@ -80,7 +81,7 @@ const ChatApp: React.FC = () => {
   const handleSendMessage = async (message: string) => {
     // Skip trial enforcement if subscriptions are disabled
     if (!featureFlags?.subscription_disabled) {
-  // Client-side trial enforcement: allow up to 10 free messages if user has no active subscription access
+      // Client-side trial enforcement: allow up to 20 free messages if user has no active subscription access
       const questionsUsed = user?.questions_used || 0;
       
       // Check if user has subscription access (active subscription or canceled but still valid)
@@ -89,7 +90,7 @@ const ChatApp: React.FC = () => {
                                     subscription?.end_date && 
                                     new Date(subscription.end_date) > new Date());
 
-  if (!hasSubscriptionAccess && questionsUsed >= 10) {
+      if (!hasSubscriptionAccess && questionsUsed >= 20) {
         // Redirect to subscription page
         window.location.href = '/subscription';
         return;
@@ -260,25 +261,11 @@ const ChatApp: React.FC = () => {
     }
   };
 
-  const handleDeleteConversation = async (conversationId: string) => {
-    try {
-      // Call backend to delete the conversation
-      await apiClient.deleteConversation(conversationId);
-      
-      // Remove from local state
-      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-      
-      // Clear active conversation if it was the deleted one
-      if (activeConversationId === conversationId) {
-        setActiveConversationId(null);
-      }
-    } catch (error) {
-      console.error('Failed to delete conversation:', error);
-      // Still remove from UI even if backend fails
-      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-      if (activeConversationId === conversationId) {
-        setActiveConversationId(null);
-      }
+  const handleDeleteConversation = (conversationId: string) => {
+    setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+    
+    if (activeConversationId === conversationId) {
+      setActiveConversationId(null);
     }
   };
 
@@ -353,7 +340,7 @@ const ChatApp: React.FC = () => {
           selectedLanguage={selectedLanguage}
           onLogout={logout}
           questionsUsed={user?.questions_used || 0}
-          maxTrial={10}
+          maxTrial={20}
           subscription={subscription || null}
         />
       </div>
@@ -386,7 +373,7 @@ const ChatApp: React.FC = () => {
               selectedLanguage={selectedLanguage}
               onLogout={logout}
               questionsUsed={user?.questions_used || 0}
-              maxTrial={10}
+              maxTrial={20}
               subscription={subscription || null}
             />
           </div>
@@ -469,11 +456,10 @@ function App() {
   const routes = [
     { path: '/', component: () => <ProtectedRoute requireSubscription={false}><ChatApp /></ProtectedRoute> },
     { path: '/login', component: LoginPage },
-    { path: '/forgot-password', component: LoginPage },
-    { path: '/reset-password', component: LoginPage },
     { path: '/subscription', component: () => <ProtectedRoute><SubscriptionPlans /></ProtectedRoute> },
     { path: '/subscription/success', component: () => <ProtectedRoute><SubscriptionSuccess /></ProtectedRoute> },
     { path: '/subscription/cancel', component: () => <ProtectedRoute><SubscriptionCancel /></ProtectedRoute> },
+    { path: '/privacy-policy', component: PrivacyPolicy },
   ];
 
   return (

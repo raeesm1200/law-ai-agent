@@ -360,6 +360,16 @@ export function ChatSidebar({
             : "This AI provides general legal information only. Always consult a qualified lawyer for legal advice."
           }
         </div>
+
+        {/* Privacy Policy link */}
+        <div className="px-3 pt-1 pb-1 text-center">
+          <a
+            href="/privacy-policy"
+            className="text-xs text-sidebar-foreground/40 hover:text-sidebar-foreground/70 underline underline-offset-2 transition-colors"
+          >
+            {selectedLanguage === "italian" ? "Informativa sulla Privacy" : "Privacy Policy"}
+          </a>
+        </div>
       </div>
     </div>
   );

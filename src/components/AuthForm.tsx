@@ -14,7 +14,6 @@ interface AuthFormProps {
   onSuccess?: () => void;
 }
 
-
 export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const { login, register } = useAuth();
   const [email, setEmail] = useState('');
@@ -23,8 +22,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('login');
-  const [showForgot, setShowForgot] = useState(false);
-  const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
   const handleSubmit = async (isRegister: boolean) => {
     setError('');
@@ -85,8 +82,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="auth-theme auth-background fixed inset-0 z-40 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' as any }}>
-      <div className="grid min-h-screen grid-cols-1 md:[grid-template-columns:55%_45%]">
+  <div className="auth-theme auth-background fixed inset-0 z-40 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' as any }}>
+  <div className="grid min-h-screen grid-cols-1 md:[grid-template-columns:55%_45%]">
         {/* Left hero / branding (expanded) */}
         <aside className="hidden md:flex flex-col items-center text-center justify-center gap-6 p-20 md:p-28 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 text-white auth-hero">
           <div className="inline-flex items-center justify-center bg-white/12 rounded-xl p-3 shadow-md">
@@ -116,110 +113,40 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {showForgot ? (
-                    <div className="space-y-6 mt-4">
-                      <h3 className="text-xl font-semibold text-center text-sky-400">Forgot Password</h3>
-                      {forgotSubmitted ? (
-                        <div className="text-center text-green-400">
-                          If the email exists, a reset link has been sent.
-                        </div>
-                      ) : (
-                        <form
-                          onSubmit={async (e) => {
-                            e.preventDefault();
-                            setIsLoading(true);
-                            setError("");
-                            try {
-                              // Use shared ApiClient so production builds use VITE_API_URL
-                              await apiClient.requestPasswordReset(email);
-                              setForgotSubmitted(true);
-                            } catch (err: any) {
-                              setError(err.message || "Something went wrong.");
-                            } finally {
-                              setIsLoading(false);
-                            }
-                          }}
-                          className="space-y-6"
-                        >
-                          <div>
-                            <Label htmlFor="forgot-email">Email address</Label>
-                            <Input
-                              id="forgot-email"
-                              type="email"
-                              className="w-full px-4 py-2 rounded bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                              value={email}
-                              onChange={e => setEmail(e.target.value)}
-                              required
-                              autoFocus
-                              disabled={isLoading}
-                            />
-                          </div>
-                          {error && <div className="text-red-400 text-sm">{error}</div>}
-                          <div className="flex flex-row items-center justify-between gap-4">
-                            <a
-                              href="#"
-                              className="text-sm text-blue-600 hover:underline font-normal"
-                              style={{ background: 'none', border: 'none', padding: 0, outline: 'none', cursor: 'pointer' }}
-                              onClick={e => { e.preventDefault(); setShowForgot(false); setForgotSubmitted(false); setError(""); }}
-                            >
-                              Back to Login
-                            </a>
-                            <Button
-                              type="submit"
-                              className="py-2 px-4 bg-sky-400 text-slate-900 font-semibold rounded hover:bg-sky-300 transition"
-                              disabled={isLoading}
-                            >
-                              {isLoading ? "Sending..." : "Send Reset Link"}
-                            </Button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  ) : (
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <Tabs value={activeTab} onValueChange={setActiveTab}>
                       <TabsList className="grid w-full grid-cols-2 gap-2 h-11 overflow-visible">
                         <TabsTrigger value="login" className="flex items-center justify-center h-10 px-4 rounded-full bg-gradient-to-r from-[#9333ea] to-[#c084fc] text-white shadow-sm text-sm md:text-base leading-none">Sign In</TabsTrigger>
                         <TabsTrigger value="register" className="flex items-center justify-center h-10 px-4 rounded-full bg-gradient-to-r from-[#9333ea] to-[#c084fc] text-white shadow-sm text-sm md:text-base leading-none">Sign Up</TabsTrigger>
                       </TabsList>
 
-                      <TabsContent value="login" className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="Enter your email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="password">Password</Label>
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="Enter your password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLoading}
-                          />
-                          <div className="flex justify-center mt-4 mb-2">
-                            <a
-                              href="#"
-                              className="text-sm text-blue-600 hover:underline font-normal"
-                              style={{ background: 'none', border: 'none', padding: 0, outline: 'none', cursor: 'pointer' }}
-                              onClick={e => { e.preventDefault(); setShowForgot(true); setError(""); }}
-                            >
-                              Forgot Password?
-                            </a>
-                          </div>
-                        </div>
-                        {error && (
-                          <Alert variant="destructive">
-                            <AlertDescription>{error}</AlertDescription>
-                          </Alert>
-                        )}
+                    <TabsContent value="login" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                      {error && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                      )}
                         <Button
                           onClick={() => handleSubmit(false)}
                           disabled={isLoading}
@@ -228,50 +155,50 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Sign In
                         </Button>
-                        <div className="mt-3 flex justify-center">
-                          <GoogleLogin onSuccess={handleGoogleCredential} onError={() => setError('Google sign-in failed')} />
-                        </div>
-                      </TabsContent>
+                      <div className="mt-3 flex justify-center">
+                        <GoogleLogin onSuccess={handleGoogleCredential} onError={() => setError('Google sign-in failed')} />
+                      </div>
+                    </TabsContent>
 
-                      <TabsContent value="register" className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="register-email">Email</Label>
-                          <Input
-                            id="register-email"
-                            type="email"
-                            placeholder="Enter your email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="register-password">Password</Label>
-                          <Input
-                            id="register-password"
-                            type="password"
-                            placeholder="Create a password (min 6 characters)"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLoading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="confirm-password">Confirm Password</Label>
-                          <Input
-                            id="confirm-password"
-                            type="password"
-                            placeholder="Confirm your password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            disabled={isLoading}
-                          />
-                        </div>
-                        {error && (
-                          <Alert variant="destructive">
-                            <AlertDescription>{error}</AlertDescription>
-                          </Alert>
-                        )}
+                    <TabsContent value="register" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="register-email">Email</Label>
+                        <Input
+                          id="register-email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="register-password">Password</Label>
+                        <Input
+                          id="register-password"
+                          type="password"
+                          placeholder="Create a password (min 6 characters)"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Confirm Password</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          placeholder="Confirm your password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                      {error && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                      )}
                         <Button
                           onClick={() => handleSubmit(true)}
                           disabled={isLoading}
@@ -280,9 +207,19 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Create Account
                         </Button>
-                      </TabsContent>
-                    </Tabs>
-                  )}
+                    </TabsContent>
+                  </Tabs>
+
+                  {/* Privacy Policy notice */}
+                  <p className="mt-4 text-center text-xs text-muted-foreground">
+                    By continuing, you agree to our{" "}
+                    <a
+                      href="/privacy-policy"
+                      className="underline underline-offset-2 hover:text-foreground transition-colors"
+                    >
+                      Privacy Policy
+                    </a>
+                  </p>
                 </CardContent>
               </Card>
             </div>
