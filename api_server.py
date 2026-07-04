@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from database import get_db, create_tables
 from models import User, Subscription, ChatHistory
 from models import ProcessedWebhookEvent
-from legal_rag_chatbot import LegalRAGChatbot
+from legal_rag_chatbot import LegalRAGChatbot, COLLECTION_UK, COLLECTION_IT_EN, COLLECTION_IT_IT
 from schemas import (
     UserCreate, UserLogin, UserResponse, Token, ChatRequest, ChatResponse,
     CreateCheckoutSessionRequest, CreateCheckoutSessionResponse,
@@ -1092,11 +1092,14 @@ async def chat_endpoint(
             raise HTTPException(status_code=403, detail={"error": "Trial limit reached. Please subscribe to continue."})
 
     try:
+        country = (request.country or "italy").lower()
         language = (request.language or "english").lower()
-        if language == "italian":
-            collection = "law_chunks_italian_language"
+        if country == "uk":
+            collection = COLLECTION_UK
+        elif language == "italian":
+            collection = COLLECTION_IT_IT
         else:
-            collection = "law_chunks"
+            collection = COLLECTION_IT_EN
 
         # Use conversation_id to manage chat history
         conversation_id = request.conversation_id or str(uuid.uuid4())
@@ -1113,7 +1116,8 @@ async def chat_endpoint(
             chatbot.get_response,
             request.message,
             collection,
-            language
+            language,
+            country
         )
 
         # Save updated history back to the dict

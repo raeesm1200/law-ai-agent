@@ -34,6 +34,10 @@ colorama.init(autoreset=True)
 # Load environment variables
 load_dotenv()
 
+COLLECTION_UK = "uk_laws"
+COLLECTION_IT_EN = "law_chunks"
+COLLECTION_IT_IT = "law_chunks_italian_language"
+
 
 class GradioSpaceEmbeddings:
     """Zero-memory embeddings using Gradio Space API."""
@@ -129,6 +133,7 @@ class LegalRAGChatbot:
         # Qdrant Configuration
         self.qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
+        self.qdrant_timeout = int(os.getenv("QDRANT_TIMEOUT", "120"))
         
         # Model Configuration - DISK-BASED LOADING
         self.embedding_model_name = "intfloat/multilingual-e5-base"
@@ -172,7 +177,8 @@ class LegalRAGChatbot:
         try:
             self.qdrant_client = QdrantClient(
                 url=self.qdrant_url,
-                api_key=self.qdrant_api_key
+                api_key=self.qdrant_api_key,
+                timeout=self.qdrant_timeout,
             )
             
             # Check if collection exists
@@ -188,7 +194,7 @@ class LegalRAGChatbot:
                 metadata_payload_key="metadata"
             )
             
-            print(f"{Fore.GREEN}✅ Qdrant vector store connected: {self.qdrant_collection}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Qdrant vector store connected: {self.qdrant_collection} (timeout={self.qdrant_timeout}s){Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}❌ Failed to connect to Qdrant: {e}{Style.RESET_ALL}")
             raise
@@ -318,6 +324,53 @@ Inserisci sempre gli URL su una riga separata che inizi con 🔗 per facilitarne
 
 Ricorda: stai fornendo informazioni legali, non consulenza legale. Includi sempre citazioni complete delle fonti."""
 
+        self.system_prompt_uk_en = """
+        You are a knowledgeable legal assistant specializing in UK law.
+Your role is to provide accurate, helpful, and well-reasoned legal information based on the provided UK legal documents (statutory instruments, regulations, and UK Parliament legislation).
+
+GREETING HANDLING:
+If the user greets you (hello, hi, good morning, etc.), respond warmly and ask what legal information they need help with. If they do not greet you, skip to answering. For example:
+"Hello! I'm your UK Legal Assistant. I can help you with questions about UK law, including statutory instruments, regulations, employment law, and more. What legal information can I assist you with today?"
+
+IMPORTANT GUIDELINES:
+1. Base your responses primarily on the provided legal context
+2. If the context does not contain sufficient information, clearly state this limitation
+3. ALWAYS cite legal sources with complete details including:
+   - The full law_name exactly as provided (never abbreviate, shorten, or paraphrase it, even if it is very long)
+   - The pdf_filename as the document filename
+4. When using retrieved chunk text, extract and explain only the portions relevant to the user's question. Do not dump the full chunk text verbatim in your answer.
+5. Provide structured, clear explanations using simple headings (not markdown)
+6. Use professional but accessible language
+7. Distinguish between legal facts and interpretations
+8. Remind users to consult qualified legal professionals for specific legal advice
+
+RESPONSE STRUCTURE:
+- Brief direct answer to the question
+- Detailed explanation based on the relevant portions of the legal context
+
+Legal Sources:
+For each relevant document, include:
+• Law Name: [full law_name verbatim]
+• Document: [pdf_filename]
+
+- Practical implications or considerations
+- Disclaimer about consulting legal professionals
+
+CITATION FORMAT:
+Always format legal sources as:
+📚 Source: [full law_name] | Document: [pdf_filename]
+
+FORMATTING RULES:
+- Do NOT use markdown formatting like ## or **
+- Use simple text headings
+- Use bullet points with • or -
+- Keep formatting clean and readable
+- For multiple sources, enter next line
+- Always reproduce the full law_name without truncation
+
+Remember: You're providing legal information, not legal advice. Always include complete source citations with the full law name and document filename.
+"""
+
         # RAG prompt template with chat history
         self.rag_template = """System: {system_prompt}
 
@@ -334,12 +387,55 @@ Legal Assistant Response:"""
         self.rag_prompt = ChatPromptTemplate.from_template(self.rag_template)
         
         print(f"{Fore.GREEN}✅ Prompt templates configured{Style.RESET_ALL}")
+
+    def _format_docs_uk(self, docs: List[Document]) -> str:
+        """Format retrieved UK legal documents for the prompt."""
+        if not docs:
+            return "No relevant legal documents found."
+
+        formatted_docs = []
+        for i, doc in enumerate(docs, 1):
+            content = None
+            if hasattr(doc, 'page_content') and doc.page_content:
+                content = str(doc.page_content)
+            elif hasattr(doc, 'content') and doc.content:
+                content = str(doc.content)
+
+            if not content or content.strip() == "":
+                print(f"⚠️ Warning: Skipping UK document {i} due to empty content")
+                continue
+
+            metadata = doc.metadata if hasattr(doc, 'metadata') else {}
+            law_name = metadata.get('law_name', '')
+            pdf_filename = metadata.get('pdf_filename', '')
+
+            law_info = []
+            if law_name:
+                law_info.append(f"Law Name: {law_name}")
+            if pdf_filename:
+                law_info.append(f"Filename: {pdf_filename}")
+
+            source_str = " | ".join(law_info) if law_info else "UK Legal Document"
+            formatted_doc = f"""Document {i}:
+📚 Legal Source Information: {source_str}
+📄 Legal Content: {content}
+
+---"""
+            formatted_docs.append(formatted_doc)
+
+        if not formatted_docs:
+            return "No valid legal documents could be retrieved."
+
+        return "\n".join(formatted_docs)
         
     def setup_chain(self):
         """Set up the RAG chain that combines retrieval and generation."""
         
         def format_docs(docs: List[Document]) -> str:
             """Format retrieved documents for the prompt."""
+            if self.qdrant_collection == COLLECTION_UK:
+                return self._format_docs_uk(docs)
+
             if not docs:
                 return "No relevant legal documents found."
             
@@ -447,59 +543,63 @@ Legal Assistant Response:"""
         
     def search_documents(self, query: str, k: int = 5) -> List[Document]:
         """Search for relevant documents in the vector store."""
-        try:
-            print(f"{Fore.CYAN}🔎 Using collection for retrieval: {self.qdrant_collection}{Style.RESET_ALL}")  # <-- Add this line
+        max_attempts = 3
+        last_error = None
 
-            # Use our custom embeddings wrapper for consistency
-            # No need to add "query:" prefix - Gradio Space handles it
-            query_embedding = self.embeddings.embed_query(query.strip())
-            
-            
-            
-            search_results = self.qdrant_client.search(
-                collection_name=self.qdrant_collection,
-                query_vector=query_embedding,
-                limit=k,
-                score_threshold=0.3
-            )
-            
-            documents = []
-            for result in search_results:
-                payload = result.payload
-                
-                # Extract content from the 'chunk' field with robust error handling
-                content = payload.get('chunk')
-                if not content or content is None:
-                    # Fallback to other possible content fields
-                    content = payload.get('text') or payload.get('content') or payload.get('page_content')
-                
-                if not content or str(content).strip() == "":
-                    print(f"⚠️ Warning: Empty content for document {payload.get('chunk_id', 'Unknown')}")
+        for attempt in range(1, max_attempts + 1):
+            try:
+                print(f"{Fore.CYAN}🔎 Using collection for retrieval: {self.qdrant_collection}{Style.RESET_ALL}")
+
+                query_embedding = self.embeddings.embed_query(query.strip())
+
+                search_results = self.qdrant_client.search(
+                    collection_name=self.qdrant_collection,
+                    query_vector=query_embedding,
+                    limit=k,
+                    score_threshold=0.3,
+                    timeout=self.qdrant_timeout,
+                )
+
+                documents = []
+                for result in search_results:
+                    payload = result.payload
+
+                    content = payload.get('chunk')
+                    if not content or content is None:
+                        content = payload.get('text') or payload.get('content') or payload.get('page_content')
+
+                    if not content or str(content).strip() == "":
+                        print(f"⚠️ Warning: Empty content for document {payload.get('chunk_id', 'Unknown')}")
+                        continue
+
+                    content = str(content).strip()
+                    metadata = {k: v for k, v in payload.items() if k != 'chunk'}
+
+                    try:
+                        doc = Document(
+                            page_content=content,
+                            metadata=metadata
+                        )
+                        documents.append(doc)
+                    except Exception as doc_error:
+                        print(f"⚠️ Warning: Could not create document object: {doc_error}")
+                        continue
+
+                print(f"✅ Successfully retrieved {len(documents)} documents")
+                return documents
+
+            except Exception as e:
+                last_error = e
+                is_timeout = "timeout" in str(e).lower() or type(e).__name__ in ("ReadTimeout", "TimeoutException")
+                if is_timeout and attempt < max_attempts:
+                    wait_seconds = attempt * 2
+                    print(f"{Fore.YELLOW}⚠️ Qdrant search timed out (attempt {attempt}/{max_attempts}), retrying in {wait_seconds}s...{Style.RESET_ALL}")
+                    time.sleep(wait_seconds)
                     continue
-                
-                # Ensure content is a string
-                content = str(content).strip()
-                
-                # Create metadata dict with all available fields except 'chunk'
-                metadata = {k: v for k, v in payload.items() if k != 'chunk'}
-                
-                # Create Document object with robust error handling
-                try:
-                    doc = Document(
-                        page_content=content,
-                        metadata=metadata
-                    )
-                    documents.append(doc)
-                except Exception as doc_error:
-                    print(f"⚠️ Warning: Could not create document object: {doc_error}")
-                    continue
-            
-            print(f"✅ Successfully retrieved {len(documents)} documents")
-            return documents
-            
-        except Exception as e:
-            print(f"{Fore.RED}❌ Error searching documents: {e}{Style.RESET_ALL}")
-            return []
+                break
+
+        print(f"{Fore.RED}❌ Error searching documents: {last_error}{Style.RESET_ALL}")
+        return []
             
     def add_to_history(self, question: str, answer: str):
         """Add an exchange to chat history."""
@@ -517,7 +617,7 @@ Legal Assistant Response:"""
         """Clear the chat history."""
         self.chat_history = []
 
-    def get_response(self, question: str, collection: str = "law_chunks", language: str = "english") -> str:
+    def get_response(self, question: str, collection: str = "law_chunks", language: str = "english", country: str = "italy") -> str:
         """Get a response from the RAG chatbot."""
         try:
             # Switch collection if needed
@@ -538,8 +638,10 @@ Legal Assistant Response:"""
             
             print(f"{Fore.GREEN}✅ Found {len(docs)} relevant documents{Style.RESET_ALL}")
             
-            # Determine the correct system prompt based on language
-            if self.language.lower() == "italian":
+            # Determine the correct system prompt based on country and language
+            if collection == COLLECTION_UK or country == "uk":
+                self.system_prompt = self.system_prompt_uk_en
+            elif self.language.lower() == "italian":
                 self.system_prompt = self.system_prompt_it
             else:
                 self.system_prompt = self.system_prompt_en
