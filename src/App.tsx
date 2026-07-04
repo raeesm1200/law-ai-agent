@@ -32,6 +32,10 @@ function getLanguageFromUrl() {
   return params.get("lang") === "italian" ? "italian" : "english";
 }
 
+function getEffectiveLanguage(country: string, language: string) {
+  return country === "uk" ? "english" : language;
+}
+
 // Main Chat Component (Protected)
 const ChatApp: React.FC = () => {
   const { user, subscription, logout, refreshUser, featureFlags } = useAuth(); // Add featureFlags
@@ -43,10 +47,12 @@ const ChatApp: React.FC = () => {
   const [selectedCountry, setSelectedCountry] = useState("italy");
   const [subscriptionError, setSubscriptionError] = useState("");
 
-  // Load user's chat history (filtered by language)
-  async function loadChatHistory(language?: string) {
+  // Load user's chat history for the active country/language context
+  async function loadChatHistory(language?: string, country?: string) {
     try {
-      const backendHistory = await apiClient.getChatHistory(language || selectedLanguage);
+      const resolvedCountry = country ?? selectedCountry;
+      const resolvedLanguage = getEffectiveLanguage(resolvedCountry, language || selectedLanguage);
+      const backendHistory = await apiClient.getChatHistory(resolvedLanguage, resolvedCountry);
       if (backendHistory && backendHistory.length > 0) {
         setConversations(backendHistory);
       } else {
@@ -60,16 +66,17 @@ const ChatApp: React.FC = () => {
 
   React.useEffect(() => {
     if (user) {
-      loadChatHistory(selectedLanguage);
+      loadChatHistory(selectedLanguage, selectedCountry);
     }
-  }, [user, selectedLanguage]);
+  }, [user, selectedCountry, selectedLanguage]);
 
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
 
   const clearBackendHistory = async () => {
     try {
-      const res = await apiClient.clearHistory(activeConversationId || undefined);
+      const effectiveLanguage = getEffectiveLanguage(selectedCountry, selectedLanguage);
+      const res = await apiClient.clearHistory(activeConversationId || undefined, selectedCountry, effectiveLanguage);
       if (res.conversation_id) {
         setActiveConversationId(res.conversation_id);
       }
@@ -144,10 +151,11 @@ const ChatApp: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const effectiveLanguage = getEffectiveLanguage(selectedCountry, selectedLanguage);
       const response = await apiClient.sendMessage(
         message,
         selectedCountry,
-        selectedLanguage,
+        effectiveLanguage,
         currentConversationId
       );
 
@@ -207,6 +215,15 @@ const ChatApp: React.FC = () => {
     }
   };
 
+  const handleCountryChange = async (newCountry: string) => {
+    if (newCountry === selectedCountry) return;
+
+    setSelectedCountry(newCountry);
+    if (newCountry === "uk") {
+      setSelectedLanguage("english");
+    }
+  };
+
   const handleLanguageChange = async (newLanguage: string) => {
     if (newLanguage === selectedLanguage) return;
 
@@ -223,7 +240,8 @@ const ChatApp: React.FC = () => {
       setConversations(prev => [newConversation, ...prev]);
       setActiveConversationId(newConversation.id);
       try {
-        await clearBackendHistory();
+        const effectiveLanguage = getEffectiveLanguage(selectedCountry, newLanguage);
+        await apiClient.clearHistory(activeConversationId || undefined, selectedCountry, effectiveLanguage);
       } catch (e) {
         console.warn('Failed to clear backend history on language switch:', e);
       }
@@ -247,7 +265,8 @@ const ChatApp: React.FC = () => {
     setActiveConversationId(tempId);
 
     try {
-      const res = await apiClient.clearHistory(tempId);
+      const effectiveLanguage = getEffectiveLanguage(selectedCountry, selectedLanguage);
+      const res = await apiClient.clearHistory(tempId, selectedCountry, effectiveLanguage);
       if (res.conversation_id) {
         setConversations(prev =>
           prev.map(conv =>
@@ -286,7 +305,7 @@ const ChatApp: React.FC = () => {
           <img src="/onir-logo.png" alt="ONIR Logo" className="h-8 w-8 object-contain" />
           <h1 className="text-lg font-semibold text-white truncate">LAW AGENT AI</h1>
           <span className="ml-2 px-2 py-1 rounded bg-primary/80 text-white text-xs whitespace-nowrap">
-            {selectedLanguage === "italian" ? "🇮🇹 Italian" : "🇺🇸 English"}
+            {selectedCountry === "uk" ? "🇬🇧 UK • EN" : selectedLanguage === "italian" ? "🇮🇹 Italian" : "🇺🇸 English"}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -334,7 +353,7 @@ const ChatApp: React.FC = () => {
           onDeleteConversation={handleDeleteConversation}
           isMobile={false}
           onClose={() => {}}
-          onCountryChange={setSelectedCountry}
+          onCountryChange={handleCountryChange}
           selectedCountry={selectedCountry}
           onLanguageChange={handleLanguageChange}
           selectedLanguage={selectedLanguage}
@@ -367,7 +386,7 @@ const ChatApp: React.FC = () => {
               onDeleteConversation={handleDeleteConversation}
               isMobile={true}
               onClose={() => setIsSidebarOpen(false)}
-              onCountryChange={setSelectedCountry}
+              onCountryChange={handleCountryChange}
               selectedCountry={selectedCountry}
               onLanguageChange={handleLanguageChange}
               selectedLanguage={selectedLanguage}

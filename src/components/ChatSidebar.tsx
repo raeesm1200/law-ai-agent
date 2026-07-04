@@ -82,6 +82,9 @@ export function ChatSidebar({
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
     onCountryChange(country);
+    if (country === "uk") {
+      onLanguageChange("english");
+    }
   };
 
   const handleLanguageChange = (language: string) => {
@@ -90,12 +93,15 @@ export function ChatSidebar({
 
   const countries = [
     { value: "italy", label: "🇮🇹 Italy", flag: "" },
+    { value: "uk", label: "🇬🇧 United Kingdom", flag: "" },
   ];
 
   const languages = [
     { value: "english", label: "English", flag: "" },
     { value: "italian", label: "Italian", flag: "" },
   ];
+  const visibleLanguages = selectedCountryState === "uk" ? languages.filter((language) => language.value === "english") : languages;
+  const activeLanguage = selectedCountryState === "uk" ? "english" : selectedLanguage;
 
   useEffect(() => {
     // Fetch system info from backend using apiClient
@@ -206,19 +212,19 @@ export function ChatSidebar({
 
         {/* Language Selection - NEW */}
         <div className="mb-3">
-          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+          <Select value={activeLanguage} onValueChange={handleLanguageChange}>
             <SelectTrigger className="w-full">
               <SelectValue>
                 <div className="flex items-center gap-2">
-                  <span role="img" aria-label={languages.find(l => l.value === selectedLanguage)?.label || "Language"}>
-                    {languages.find(l => l.value === selectedLanguage)?.flag}
+                  <span role="img" aria-label={visibleLanguages.find(l => l.value === activeLanguage)?.label || "Language"}>
+                    {visibleLanguages.find(l => l.value === activeLanguage)?.flag}
                   </span>
-                  {languages.find(l => l.value === selectedLanguage)?.label || "Select Language"}
+                  {visibleLanguages.find(l => l.value === activeLanguage)?.label || "Select Language"}
                 </div>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {languages.map((language) => (
+              {visibleLanguages.map((language) => (
                 <SelectItem key={language.value} value={language.value}>
                   <div className="flex items-center gap-2">
                     <span>{language.flag}</span>
