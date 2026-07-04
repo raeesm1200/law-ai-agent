@@ -295,10 +295,12 @@ class ApiClient {
     }
   }
 
-  async clearHistory(conversationId?: string): Promise<{ status: string; conversation_id: string }> {
+  async clearHistory(conversationId?: string, country?: string, language?: string): Promise<{ status: string; conversation_id: string }> {
     try {
       const response = await this.client.post('/api/clear-history', { 
-        conversation_id: conversationId 
+        conversation_id: conversationId,
+        country,
+        language
       });
       return response.data;
     } catch (error) {
@@ -308,10 +310,11 @@ class ApiClient {
   }
 
   // Chat history endpoints
-  async getChatHistory(language?: string): Promise<any[]> {
+  async getChatHistory(language?: string, country?: string): Promise<any[]> {
     try {
       const params: any = {};
       if (language) params.language = language;
+      if (country) params.country = country;
       const response = await this.client.get('/api/chat/history', { params });
       return response.data;
     } catch (error) {
