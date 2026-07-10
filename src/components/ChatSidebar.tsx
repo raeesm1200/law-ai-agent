@@ -82,9 +82,6 @@ export function ChatSidebar({
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
     onCountryChange(country);
-    if (country === "uk") {
-      onLanguageChange("english");
-    }
   };
 
   const handleLanguageChange = (language: string) => {

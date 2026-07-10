@@ -27,6 +27,9 @@ interface Conversation {
   messages: Message[];
 }
 
+type HistoryByScope = Record<string, Conversation[]>;
+type ActiveConversationByScope = Record<string, string | null>;
+
 function getLanguageFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("lang") === "italian" ? "italian" : "english";
@@ -36,31 +39,59 @@ function getEffectiveLanguage(country: string, language: string) {
   return country === "uk" ? "english" : language;
 }
 
+function getHistoryScope(country: string, language: string) {
+  return `${country}:${getEffectiveLanguage(country, language)}`;
+}
+
 // Main Chat Component (Protected)
 const ChatApp: React.FC = () => {
   const { user, subscription, logout, refreshUser, featureFlags } = useAuth(); // Add featureFlags
   const [selectedLanguage, setSelectedLanguage] = useState(getLanguageFromUrl());
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [historyByScope, setHistoryByScope] = useState<HistoryByScope>({});
+  const [activeConversationByScope, setActiveConversationByScope] = useState<ActiveConversationByScope>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState("italy");
   const [subscriptionError, setSubscriptionError] = useState("");
+
+  const activeHistoryScope = getHistoryScope(selectedCountry, selectedLanguage);
+  const conversations = historyByScope[activeHistoryScope] || [];
+  const activeConversationId = activeConversationByScope[activeHistoryScope] || null;
+
+  const updateConversationsForScope = (
+    scope: string,
+    updater: (conversations: Conversation[]) => Conversation[]
+  ) => {
+    setHistoryByScope(previous => ({
+      ...previous,
+      [scope]: updater(previous[scope] || []),
+    }));
+  };
+
+  const setActiveConversationForScope = (scope: string, conversationId: string | null) => {
+    setActiveConversationByScope(previous => ({ ...previous, [scope]: conversationId }));
+  };
 
   // Load user's chat history for the active country/language context
   async function loadChatHistory(language?: string, country?: string) {
     try {
       const resolvedCountry = country ?? selectedCountry;
       const resolvedLanguage = getEffectiveLanguage(resolvedCountry, language || selectedLanguage);
+      const scope = getHistoryScope(resolvedCountry, resolvedLanguage);
       const backendHistory = await apiClient.getChatHistory(resolvedLanguage, resolvedCountry);
-      if (backendHistory && backendHistory.length > 0) {
-        setConversations(backendHistory);
-      } else {
-        setConversations([]);
-      }
+      const loadedConversations = backendHistory || [];
+      setHistoryByScope(previous => ({ ...previous, [scope]: loadedConversations }));
+      setActiveConversationByScope(previous => {
+        const currentId = previous[scope];
+        const hasCurrentConversation = loadedConversations.some(conversation => conversation.id === currentId);
+        return {
+          ...previous,
+          [scope]: hasCurrentConversation ? currentId : (loadedConversations[0]?.id || null),
+        };
+      });
     } catch (error) {
       console.error('Failed to load chat history:', error);
-      setConversations([]);
+      // Keep the last successfully loaded history for this scope if a refresh fails.
     }
   }
 
@@ -68,22 +99,10 @@ const ChatApp: React.FC = () => {
     if (user) {
       loadChatHistory(selectedLanguage, selectedCountry);
     }
-  }, [user, selectedCountry, selectedLanguage]);
+  }, [user]);
 
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
-
-  const clearBackendHistory = async () => {
-    try {
-      const effectiveLanguage = getEffectiveLanguage(selectedCountry, selectedLanguage);
-      const res = await apiClient.clearHistory(activeConversationId || undefined, selectedCountry, effectiveLanguage);
-      if (res.conversation_id) {
-        setActiveConversationId(res.conversation_id);
-      }
-    } catch (e) {
-      console.warn("Failed to clear backend chat history:", e);
-    }
-  };
 
   const handleSendMessage = async (message: string) => {
     // Skip trial enforcement if subscriptions are disabled
@@ -105,6 +124,7 @@ const ChatApp: React.FC = () => {
     }
 
     setSubscriptionError("");
+    const messageScope = activeHistoryScope;
     let currentConversationId = activeConversationId;
 
     if (!currentConversationId) {
@@ -116,8 +136,8 @@ const ChatApp: React.FC = () => {
         timestamp: "now",
         messages: []
       };
-      setConversations(prev => [newConversation, ...prev]);
-      setActiveConversationId(currentConversationId);
+      updateConversationsForScope(messageScope, previous => [newConversation, ...previous]);
+      setActiveConversationForScope(messageScope, currentConversationId);
     }
 
     const newUserMessage: Message = {
@@ -127,7 +147,7 @@ const ChatApp: React.FC = () => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setConversations(prev => {
+    updateConversationsForScope(messageScope, prev => {
       const exists = prev.some(conv => conv.id === currentConversationId);
       if (!exists) {
         return [
@@ -166,7 +186,7 @@ const ChatApp: React.FC = () => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setConversations(prev =>
+      updateConversationsForScope(messageScope, prev =>
         prev.map(conv =>
           conv.id === currentConversationId
             ? {
@@ -203,7 +223,7 @@ const ChatApp: React.FC = () => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setConversations(prev =>
+      updateConversationsForScope(messageScope, prev =>
         prev.map(conv =>
           conv.id === currentConversationId
             ? { ...conv, messages: [...conv.messages, errorMsg] }
@@ -218,40 +238,21 @@ const ChatApp: React.FC = () => {
   const handleCountryChange = async (newCountry: string) => {
     if (newCountry === selectedCountry) return;
 
+    const newLanguage = newCountry === "uk" ? "english" : selectedLanguage;
     setSelectedCountry(newCountry);
-    if (newCountry === "uk") {
-      setSelectedLanguage("english");
-    }
+    setSelectedLanguage(newLanguage);
+    await loadChatHistory(newLanguage, newCountry);
   };
 
   const handleLanguageChange = async (newLanguage: string) => {
     if (newLanguage === selectedLanguage) return;
 
-    const activeConv = conversations.find(c => c.id === activeConversationId);
-
-    if (activeConv && activeConv.messages && activeConv.messages.length > 0) {
-      const newConversation: Conversation = {
-        id: `${Date.now()}`,
-        title: "New Legal Consultation",
-        lastMessage: "",
-        timestamp: "now",
-        messages: []
-      };
-      setConversations(prev => [newConversation, ...prev]);
-      setActiveConversationId(newConversation.id);
-      try {
-        const effectiveLanguage = getEffectiveLanguage(selectedCountry, newLanguage);
-        await apiClient.clearHistory(activeConversationId || undefined, selectedCountry, effectiveLanguage);
-      } catch (e) {
-        console.warn('Failed to clear backend history on language switch:', e);
-      }
-    }
-
-    // Update selected language without full page reload and load the language-specific history
     setSelectedLanguage(newLanguage);
+    await loadChatHistory(newLanguage, selectedCountry);
   };
 
   const handleNewConversation = async () => {
+    const newConversationScope = activeHistoryScope;
     const tempId = `${Date.now()}`;
     const newConversation: Conversation = {
       id: tempId,
@@ -261,30 +262,49 @@ const ChatApp: React.FC = () => {
       messages: []
     };
 
-    setConversations(prev => [newConversation, ...prev]);
-    setActiveConversationId(tempId);
+    updateConversationsForScope(newConversationScope, previous => [newConversation, ...previous]);
+    setActiveConversationForScope(newConversationScope, tempId);
 
     try {
       const effectiveLanguage = getEffectiveLanguage(selectedCountry, selectedLanguage);
       const res = await apiClient.clearHistory(tempId, selectedCountry, effectiveLanguage);
       if (res.conversation_id) {
-        setConversations(prev =>
+        updateConversationsForScope(newConversationScope, prev =>
           prev.map(conv =>
             conv.id === tempId ? { ...conv, id: res.conversation_id } : conv
           )
         );
-        setActiveConversationId(res.conversation_id);
+        setActiveConversationForScope(newConversationScope, res.conversation_id);
       }
     } catch (e) {
       console.warn("Failed to clear backend chat history:", e);
     }
   };
 
-  const handleDeleteConversation = (conversationId: string) => {
-    setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-    
+  const handleDeleteConversation = async (conversationId: string) => {
+    const scope = activeHistoryScope;
+    const deletedConversation = conversations.find(conversation => conversation.id === conversationId);
+    const remainingConversations = conversations.filter(conversation => conversation.id !== conversationId);
+
+    setHistoryByScope(previous => ({ ...previous, [scope]: remainingConversations }));
     if (activeConversationId === conversationId) {
-      setActiveConversationId(null);
+      setActiveConversationForScope(scope, remainingConversations[0]?.id || null);
+    }
+
+    try {
+      await apiClient.deleteConversation(conversationId);
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+      if (deletedConversation) {
+        updateConversationsForScope(scope, previous =>
+          previous.some(conversation => conversation.id === conversationId)
+            ? previous
+            : [deletedConversation, ...previous]
+        );
+        if (activeConversationId === conversationId) {
+          setActiveConversationForScope(scope, conversationId);
+        }
+      }
     }
   };
 
@@ -348,7 +368,7 @@ const ChatApp: React.FC = () => {
         <ChatSidebar 
           conversations={conversations}
           activeConversationId={activeConversationId || undefined}
-          onSelectConversation={setActiveConversationId}
+          onSelectConversation={(id) => setActiveConversationForScope(activeHistoryScope, id)}
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}
           isMobile={false}
@@ -376,7 +396,7 @@ const ChatApp: React.FC = () => {
               conversations={conversations}
               activeConversationId={activeConversationId || undefined}
               onSelectConversation={(id) => {
-                setActiveConversationId(id);
+                setActiveConversationForScope(activeHistoryScope, id);
                 setIsSidebarOpen(false);
               }}
               onNewConversation={() => {
