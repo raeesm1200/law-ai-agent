@@ -1216,15 +1216,18 @@ async def clear_history_endpoint(
 @app.get("/api/chat/history")
 async def get_chat_history(
     language: Optional[str] = None,
+    country: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get user's chat history from database"""
     try:
-        # Get chat history from database, optionally filtered by language
+        # Get chat history from database, optionally filtered by language and country
         query = db.query(ChatHistory).filter(ChatHistory.user_id == current_user.id)
         if language:
             query = query.filter(ChatHistory.language == language.lower())
+        if country:
+            query = query.filter(ChatHistory.country == country.lower())
 
         # Return oldest records first so messages per record remain user->bot in chronological order
         chat_records = query.order_by(ChatHistory.created_at.asc()).limit(100).all()
